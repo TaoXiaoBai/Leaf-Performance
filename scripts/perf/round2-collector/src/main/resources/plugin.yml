@@ -1,0 +1,12 @@
+name: TickCollector
+version: 1.0.0-local
+main: local.leafperf.tickcollector.TickCollectorPlugin
+load: STARTUP
+commands:
+  tickcollector:
+    description: Capture exact published busy-tick samples to a bounded in-memory window
+    usage: /tickcollector <start <ticks> <timeoutSeconds> [label]|status|abort>
+    permission: tickcollector.control
+permissions:
+  tickcollector.control:
+    default: op
