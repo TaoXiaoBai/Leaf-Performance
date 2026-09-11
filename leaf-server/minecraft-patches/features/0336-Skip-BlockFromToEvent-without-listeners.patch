@@ -1,0 +1,65 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Sat, 12 Sep 2026 00:30:00 +0800
+Subject: [PATCH] Skip BlockFromToEvent construction without listeners
+
+Avoid constructing and dispatching BlockFromToEvent from the two fluid
+spread call sites when no plugin has registered a listener. Listener-present
+and cancellation behavior remains unchanged.
+
+Source: Paper PR #14173 by flennium, commit 947bb910.
+License: GPL-3.0; attribution retained per Paper contribution terms.
+
+---
+ .../world/level/material/FlowingFluid.java | 24 ++++++++++++-------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
+
+diff --git a/net/minecraft/world/level/material/FlowingFluid.java b/net/minecraft/world/level/material/FlowingFluid.java
+--- a/net/minecraft/world/level/material/FlowingFluid.java
++++ b/net/minecraft/world/level/material/FlowingFluid.java
+@@ -163,13 +163,16 @@ public abstract class FlowingFluid extends Fluid {
+                 if (belowFluid.canBeReplacedWith(level, belowPos, newBelowFluidType, Direction.DOWN)
+                     && canHoldSpecificFluid(level, belowPos, belowState, newBelowFluidType)) {
+                     // CraftBukkit start
+-                    org.bukkit.block.Block source = org.bukkit.craftbukkit.block.CraftBlock.at(level, pos);
+-                    org.bukkit.event.block.BlockFromToEvent event = new org.bukkit.event.block.BlockFromToEvent(source, org.bukkit.block.BlockFace.DOWN);
+-                    level.getCraftServer().getPluginManager().callEvent(event);
++                    // Leaf-Performance start - avoid event allocation when unused
++                    if (org.bukkit.event.block.BlockFromToEvent.getHandlerList().getRegisteredListeners().length != 0) {
++                        org.bukkit.block.Block source = org.bukkit.craftbukkit.block.CraftBlock.at(level, pos);
++                        org.bukkit.event.block.BlockFromToEvent event = new org.bukkit.event.block.BlockFromToEvent(source, org.bukkit.block.BlockFace.DOWN);
++                        level.getCraftServer().getPluginManager().callEvent(event);
+ 
+-                    if (event.isCancelled()) {
+-                        return;
++                        if (event.isCancelled()) {
++                            return;
++                        }
+                     }
++                    // Leaf-Performance end - avoid event allocation when unused
+                     // CraftBukkit end
+                     this.spreadTo(level, belowPos, belowState, Direction.DOWN, newBelowFluid);
+@@ -202,13 +205,16 @@ public abstract class FlowingFluid extends Fluid {
+                 final BlockState neighborState = level.getBlockStateIfLoaded(neighborPos); // Paper - Prevent chunk loading from fluid flowing
+                 if (neighborState == null) continue; // Paper - Prevent chunk loading from fluid flowing
+                 // CraftBukkit start
+-                org.bukkit.block.Block source = org.bukkit.craftbukkit.block.CraftBlock.at(level, pos);
+-                org.bukkit.event.block.BlockFromToEvent event = new org.bukkit.event.block.BlockFromToEvent(source, org.bukkit.craftbukkit.block.CraftBlock.notchToBlockFace(spread));
+-                level.getCraftServer().getPluginManager().callEvent(event);
++                // Leaf-Performance start - avoid event allocation when unused
++                if (org.bukkit.event.block.BlockFromToEvent.getHandlerList().getRegisteredListeners().length != 0) {
++                    org.bukkit.block.Block source = org.bukkit.craftbukkit.block.CraftBlock.at(level, pos);
++                    org.bukkit.event.block.BlockFromToEvent event = new org.bukkit.event.block.BlockFromToEvent(source, org.bukkit.craftbukkit.block.CraftBlock.notchToBlockFace(spread));
++                    level.getCraftServer().getPluginManager().callEvent(event);
+ 
+-                if (event.isCancelled()) {
+-                    continue;
++                    if (event.isCancelled()) {
++                        continue;
++                    }
+                 }
++                // Leaf-Performance end - avoid event allocation when unused
+                 // CraftBukkit end
+                 this.spreadTo(level, neighborPos, neighborState, spread, newNeighborFluid); // Paper - Prevent chunk loading from fluid flowing
+-- 
+2.55.0.windows.5
