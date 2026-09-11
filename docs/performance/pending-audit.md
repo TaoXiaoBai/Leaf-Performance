@@ -24,6 +24,10 @@ This is an experimental integration queue, not a benchmark report. Numbers and c
   - Effect: does not install the impossible job-site AcquirePoi behavior for nitwits.
   - Status: compiled and startup tested; RNG/Brain scheduling/plugin-observation audit deferred.
 
+- `[3f841109]` Vehicle update/move no-listener guards
+  - Source: Paper PR #14173, flennium, commit `947bb910`; GPL-3.0 attribution retained in the patch.
+  - Effect: skips vehicle update/move event allocation and avoids unused minecart location conversion when no listener exists.
+  - Status: compiled and startup tested; dynamic-listener and vehicle-plugin audit deferred.
 ## Deferred validation
 
 - Proper performance benchmarks and A/B comparison.
@@ -33,5 +37,7 @@ This is an experimental integration queue, not a benchmark report. Numbers and c
 
 ## Smoke note
 
-- JDK 25 patch application and Paperclip build succeeded.
-- The isolated server reached Done with zero plugins. The piped console stop command then hit a pre-existing-looking console command source NPE; the managed test process was terminated. Root-cause attribution is deferred and this is not counted as a clean shutdown test.
+- JDK 25 `applyAllPatches` and `leaf-server:createPaperclipJar` succeeded.
+- Final Paperclip SHA-256: `073FEFFAF01190A30E40DAD8068A5619FA4A2915CEE37AE907A86737C9689466`.
+- The final isolated zero-plugin server reached `Done (12.238s)` with no ERROR/FATAL/Exception marker before the harness-owned process was stopped.
+- An earlier piped console `stop` attempt reached `Done` but the command itself threw a console command-source NPE. Attribution and clean-shutdown behavior remain deferred.
