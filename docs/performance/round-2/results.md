@@ -45,7 +45,7 @@ H1 让 `PoiAccess` 在完成“最近 5 个”选择之后应用现有 `validPoi
 
 ## 构建、测试与已知失败归因
 
-候选和最终撤销态 jar 均使用 JDK 25 `leaf-server:createPaperclipJar` 成功构建。`applyAllPatches -x checkoutPaperRepo` 在已初始化的同龄 checkout 上成功完整应用 patch stack；合同的普通 `applyAllPatches` 入口仍在本机遭遇 Git-for-Windows `git-submodule` 的 `fork: Resource temporarily unavailable` / exit 254，这是 checkout wrapper 基础设施故障，不伪装为通过。最终 `leaf-server:test` 执行 8951 项，结果精确为冻结基线同一 10 failed / 7 skipped（无新增或集合变化），因此 Gradle 按预期返回 1。
+候选和最终撤销态 jar 均使用 JDK 25 `leaf-server:createPaperclipJar` 成功构建。Git-for-Windows 的 shell `git-submodule` 最初出现 `fork: Resource temporarily unavailable` / exit 254；在 ignored `run/perf/round2/tools` 使用只委托给 `git submodule--helper` 的本地 JDK launcher（其余 Git helper 仍取自原 exec-path）后，合同原命令 `applyAllPatches --stacktrace --no-daemon` 成功完整执行。最终 `leaf-server:test` 执行 8951 项，结果精确为冻结基线同一 10 failed / 7 skipped（无新增或集合变化），因此 Gradle 按预期返回 1。
 
 ## 外部来源
 
