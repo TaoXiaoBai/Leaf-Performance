@@ -7,7 +7,8 @@ Preserve legacy durability semantics while checking the component patch
 directly instead of constructing and comparing a CraftMetaItem on every
 hasItemMeta call.
 
-Source: Paper PR #13928.
+Source: Paper PR #13928 by MelodyYuuka, head e265e632818c0c7cacc05081592f7fa575b48124.
+License: GPL-3.0 under Paper contribution terms; attribution retained.
 Status: experimental; compatibility audit deferred.
 
 ---
