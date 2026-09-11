@@ -1,48 +1,33 @@
-<img src="public/image/leaf_banner.png" alt="Leaf">
-<div align="center">
+# Leaf-Performance
 
-[![Download](https://img.shields.io/badge/releases-blue?label=download&style=for-the-badge&colorA=19201a&colorB=298046)](https://www.leafmc.one/download)⠀
-[![Github Actions Build](https://img.shields.io/github/actions/workflow/status/Winds-Studio/Leaf/build-262.yml?&style=for-the-badge&colorA=19201a&colorB=298046)](https://github.com/Winds-Studio/Leaf/actions)⠀
-[![Discord](https://img.shields.io/discord/1145991395388162119?label=discord&style=for-the-badge&colorA=19201a&colorB=298046)](https://discord.gg/gfgAwdSEuM)
-[![Docs](https://img.shields.io/badge/leafmc.one/docs/-blue?label=docs&style=for-the-badge&colorA=19201a&colorB=298046)](https://www.leafmc.one/docs/getting-started)
+> [!IMPORTANT]
+> **Leaf-Performance is an unofficial, private experimental fork based on [Leaf](https://github.com/Winds-Studio/Leaf).** It is not a Leaf release, is not endorsed by the Leaf maintainers, and should not be used to report fork-specific bugs to them.
 
-**Leaf** is a [Paper](https://papermc.io/) fork designed to be customizable and high-performance.
-</div>
+The logo is text now because the benchmark does not care how pretty the banner is. This repository is a personal performance workbench: measure first, cut once, and throw the patch into the bin when the numbers say “nice placebo.”
 
-> [!WARNING]
-> Leaf is a performance-oriented fork. Make sure to take backups **before** switching to it. Everyone is welcome to contribute optimizations or report issues to help us improve.
+**English** | [中文（上游 Leaf 说明）](public/readme/README_CN.md)
 
-**English** | [中文](public/readme/README_CN.md)
+## 🧪 Scope and policy
 
-## 🍃 Features
-- **Based on [Paper](https://papermc.io/)** for generic performance and flexible API
-- **Async** pathfinding, mob spawning and entity tracker
-- **Various optimizations** blending from [other forks](#-credits) and our own
-- **Fully compatible** with Spigot and Paper plugins
-- **Latest dependencies**, keeping all dependencies up-to-date
-- **Allows all characters in usernames**, including Chinese and other characters
-- **Fixes** some Minecraft bugs
-- **Mod Protocols** support
-- **More customized** relying on features of [Purpur](https://github.com/PurpurMC/Purpur)
-- **Linear region file format**, to save disk space
-- **Maintenance friendly**, integrating with [Sentry](https://sentry.io/welcome/) of [Pufferfish](https://github.com/pufferfish-gg/Pufferfish) to easily track all errors coming from your server in extreme detail
-- And more...
+- Tracks the upstream Leaf `ver/26.2` line. Versions before 26.2 are not currently planned.
+- Stays in the Paper-style server model; this is **not a Folia clone** and will not disguise thread-model changes as free speed.
+- Full plugin compatibility is not the first priority. Vanilla/Paper behavior and plugin-facing contracts are preserved unless an experiment explicitly documents a trade-off.
+- Important optimizations require a reproducible workload and profiler evidence, followed by the same-condition A/B run. No credible benefit means the change is removed.
+- Runtime safety, lifecycle rules, snapshots, unknown chunk semantics, completed work and queues are not negotiable benchmark fuel. Resource-for-latency trades require an explicit budget.
+- Back up worlds before testing. This fork is allowed to be opinionated; your only copy of a production world is not.
 
-## 📈 bStats
-[![bStats Graph Data](https://bstats.org/signatures/server-implementation/Leaf.svg)](https://bstats.org/plugin/server-implementation/Leaf)
+The first local experiment and its limitations are documented in [`docs/performance/round-1-baseline.md`](docs/performance/round-1-baseline.md). Those measurements describe one controlled machine and workload, not public-server performance and not a universal speed claim.
 
-## 📫 Contact
-- Discord: [`https://discord.com/invite/gfgAwdSEuM`](https://discord.com/invite/gfgAwdSEuM)
-- QQ Group: `619278377`
+## 🔗 Project links
 
-## 📫 Donation
-If you love our work, feel free to donate via our [Open Collective](https://opencollective.com/Winds-Studio) or [Dreeam's AFDIAN](https://afdian.com/a/Dreeam) :)
+- Fork issues: <https://github.com/TaoXiaoBai/Leaf-Performance/issues>
+- Upstream source: <https://github.com/Winds-Studio/Leaf>
+- Upstream documentation: <https://www.leafmc.one/docs/getting-started>
+- Upstream releases: <https://github.com/Winds-Studio/Leaf/releases>
 
-## 📥 Download
-Download Leaf from our [Website](https://www.leafmc.one/download) or get latest build in [GitHub Releases](https://github.com/Winds-Studio/Leaf/releases)
+## 📈 Upstream services
 
-## 📄 Documentation
-Documentation about how to use/configure Leaf: [Leaf Docs](https://www.leafmc.one/docs/getting-started)
+Leaf's [bStats page](https://bstats.org/plugin/server-implementation/Leaf), Discord, website, donation pages and other services belong to the upstream Leaf project. This fork does not claim a separate bStats service or statistics ID.
 
 ## 📦 Building
 Building a Paperclip JAR for distribution:
