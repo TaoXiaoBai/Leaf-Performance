@@ -17,7 +17,7 @@ License: GPL-3.0; attribution retained per Paper contribution terms.
 diff --git a/net/minecraft/world/level/material/FlowingFluid.java b/net/minecraft/world/level/material/FlowingFluid.java
 --- a/net/minecraft/world/level/material/FlowingFluid.java
 +++ b/net/minecraft/world/level/material/FlowingFluid.java
-@@ -163,12 +163,15 @@ public abstract class FlowingFluid extends Fluid {
+@@ -163,12 +163,16 @@ public abstract class FlowingFluid extends Fluid {
                  if (belowFluid.canBeReplacedWith(level, belowPos, newBelowFluidType, Direction.DOWN)
                      && canHoldSpecificFluid(level, belowPos, belowState, newBelowFluidType)) {
                      // CraftBukkit start
@@ -39,7 +39,7 @@ diff --git a/net/minecraft/world/level/material/FlowingFluid.java b/net/minecraf
 +                    // Leaf-Performance end - avoid event allocation when unused
                      // CraftBukkit end
                      this.spreadTo(level, belowPos, belowState, Direction.DOWN, newBelowFluid);
-@@ -202,12 +205,15 @@ public abstract class FlowingFluid extends Fluid {
+@@ -202,12 +206,16 @@ public abstract class FlowingFluid extends Fluid {
                  final BlockState neighborState = level.getBlockStateIfLoaded(neighborPos); // Paper - Prevent chunk loading from fluid flowing
                  if (neighborState == null) continue; // Paper - Prevent chunk loading from fluid flowing
                  // CraftBukkit start
