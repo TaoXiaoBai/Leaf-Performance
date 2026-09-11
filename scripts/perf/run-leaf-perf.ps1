@@ -88,5 +88,3 @@ finally {
         if (-not $process.WaitForExit(30000)) { $process.Kill($true) }
     }
 }
-
-
