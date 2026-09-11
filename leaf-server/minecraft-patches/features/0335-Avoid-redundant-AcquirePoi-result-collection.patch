@@ -1,0 +1,71 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Fri, 11 Sep 2026 18:00:00 +0800
+Subject: [PATCH] Avoid redundant AcquirePoi result collection
+
+Let PoiAccess apply AcquirePoi's post-selection validity filter while
+converting records directly into the destination set. This preserves the
+nearest-five selection and HashSet iteration semantics while removing one
+ArrayList, backing array, iterator, and copy loop per acquisition attempt.
+The existing BiPredicate is passed directly, so the fast path adds no captured
+lambda allocation.
+
+Source: local profile-driven optimization; no external code copied.
+License: GPL-3.0-only, matching the server patch set.
+
+diff --git a/ca/spottedleaf/moonrise/patches/poi_lookup/PoiAccess.java b/ca/spottedleaf/moonrise/patches/poi_lookup/PoiAccess.java
+index ddf8c374..8a8999eb 100644
+--- a/ca/spottedleaf/moonrise/patches/poi_lookup/PoiAccess.java
++++ b/ca/spottedleaf/moonrise/patches/poi_lookup/PoiAccess.java
+@@ -10,6 +10,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+ import java.util.function.BiPredicate;
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.Holder;
++import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.util.Mth;
+ import net.minecraft.world.entity.ai.village.poi.PoiManager;
+ import net.minecraft.world.entity.ai.village.poi.PoiRecord;
+@@ -343,7 +344,9 @@ public final class PoiAccess {
+                                                final PoiManager.Occupancy occupancy,
+                                                final boolean load,
+                                                final int max,
+-                                               final List<Pair<Holder<PoiType>, BlockPos>> ret) {
++                                               final ServerLevel resultLevel,
++                                               final BiPredicate<ServerLevel, BlockPos> resultPredicate,
++                                               final Set<Pair<Holder<PoiType>, BlockPos>> ret) {
+         final Set<BlockPos> positions = new HashSet<>();
+         // pos predicate is last thing that runs before adding to ret.
+         final Predicate<BlockPos> newPredicate = (final BlockPos pos) -> {
+@@ -359,7 +362,10 @@ public final class PoiAccess {
+         );
+ 
+         for (final PoiRecord record : toConvert) {
+-            ret.add(Pair.of(record.getPoiType(), record.getPos()));
++            final BlockPos pos = record.getPos();
++            if (resultPredicate == null || resultPredicate.test(resultLevel, pos)) {
++                ret.add(Pair.of(record.getPoiType(), pos));
++            }
+         }
+     }
+ 
+diff --git a/net/minecraft/world/entity/ai/behavior/AcquirePoi.java b/net/minecraft/world/entity/ai/behavior/AcquirePoi.java
+index 19993d94..c1850a1c 100644
+--- a/net/minecraft/world/entity/ai/behavior/AcquirePoi.java
++++ b/net/minecraft/world/entity/ai/behavior/AcquirePoi.java
+@@ -133,14 +133,8 @@ public class AcquirePoi {
+                             return true;
+                         };
+                         // Paper start - optimise POI searches
+-                        java.util.List<Pair<Holder<PoiType>, BlockPos>> poiPositionsRaw = new java.util.ArrayList<>();
+-                        ca.spottedleaf.moonrise.patches.poi_lookup.PoiAccess.findNearestPoiPositions(poiManager, poiType, cacheTest, body.blockPosition(), level.purpurConfig.villagerAcquirePoiSearchRadius, Double.MAX_VALUE, PoiManager.Occupancy.HAS_SPACE, ca.spottedleaf.moonrise.patches.poi_lookup.PoiAccess.LOAD_FOR_SEARCHING, 5, poiPositionsRaw); // Purpur - Configurable villager search radius
+-                        Set<Pair<Holder<PoiType>, BlockPos>> poiPositions = new java.util.HashSet<>(poiPositionsRaw.size());
+-                        for (Pair<Holder<PoiType>, BlockPos> pair : poiPositionsRaw) {
+-                            if (validPoi.test(level, pair.getSecond())) {
+-                                poiPositions.add(pair);
+-                            }
+-                        }
++                        Set<Pair<Holder<PoiType>, BlockPos>> poiPositions = new java.util.HashSet<>(5);
++                        ca.spottedleaf.moonrise.patches.poi_lookup.PoiAccess.findNearestPoiPositions(poiManager, poiType, cacheTest, body.blockPosition(), level.purpurConfig.villagerAcquirePoiSearchRadius, Double.MAX_VALUE, PoiManager.Occupancy.HAS_SPACE, ca.spottedleaf.moonrise.patches.poi_lookup.PoiAccess.LOAD_FOR_SEARCHING, 5, level, validPoi, poiPositions); // Purpur - Configurable villager search radius
+                         // Paper end - optimise POI searches
+                         // Kaiiju start - petal - async path processing
+                         Path path = findPathToPois(body, poiPositions);
