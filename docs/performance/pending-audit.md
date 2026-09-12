@@ -1,106 +1,107 @@
-# Pending performance audit
+# Final performance audit — Leaf 26.2 integration round
 
-This is an experimental integration queue, not a benchmark report. Performance numbers and broad compatibility claims are intentionally deferred to the independent audit.
-
-Current upstream base: `65fe1ee470010af64bc56071017b729f3e1917ac`.
-Pre-sync base: `2aede50ca8250b0143b4779d8da1047f2dcf4c57`.
+This document records an experimental integration and its subsequent independent audit. It is not a whole-server benchmark report and makes no percentage or broad compatibility claims.
 
 ## Upstream sync
 
-- Latest Leaf commits integrated first: `aedd1e18` (reduce redundant `seenBy` update) and `65fe1ee4` (legacy tracker ticking option).
-- The fork was rebased rather than merged. Backup branch/tag `backup/ver-26.2-pre-upstream-sync-b68cbda2` and `backup-ver-26.2-pre-upstream-sync-b68cbda2` point to pre-sync `b68cbda2f0346077c7eb8e97ac7e6f60438a43bd`.
-- No existing Leaf-Performance optimization was equivalent to the two upstream changes; all seven existing experimental optimizations reapplied without conflict.
-- Post-sync minimum gate: `applyAllPatches`, Paperclip build, and a fresh zero-plugin JDK 25 startup to `Done (9.101s)` with no `ERROR`/`FATAL`.
+- Old Leaf base: `2aede50ca8250b0143b4779d8da1047f2dcf4c57`.
+- New Leaf base: `65fe1ee470010af64bc56071017b729f3e1917ac`.
+- Integrated upstream commits: `aedd1e18` (reduce redundant `seenBy` update) and `65fe1ee4` (legacy tracker ticking option).
+- Method: fork commits rebased onto `upstream/ver/26.2`; no merge commit.
+- Pre-sync backup branch/tag: `backup/ver-26.2-pre-upstream-sync-b68cbda2` and `backup-ver-26.2-pre-upstream-sync-b68cbda2`, both pointing to `b68cbda2f0346077c7eb8e97ac7e6f60438a43bd`.
+- No existing experiment was duplicated by those two upstream commits. All then-existing patches initially reapplied without conflict.
+- Post-sync gate passed: JDK 25 `applyAllPatches`, Paperclip build, zero-plugin `Done (9.101s)`, and no `ERROR`/`FATAL`.
 
-## Existing experimental patches after rebase
+## Integration round
 
-- `[4aa7b092]` AcquirePoi result collection: removes one intermediate result list and copy loop.
-- `[395c0ea4]` BlockFromToEvent no-listener guard: Paper PR #14173, flennium, GPL-3.0 attribution retained.
-- `[c095d375]` CraftItemStack.hasItemMeta fast path: Paper PR #13928; direct component inspection avoids ItemMeta construction.
-- `[d2916b87]` Nitwit job-site acquisition skip: independently adapted from the invariant discussed in Lithium PR #718.
-- `[f15a4a13]` Vehicle update/move no-listener guards: Paper PR #14173.
-- `[d052eb68]` Vehicle block-collision no-listener guard: Paper PR #14173; one-listener minecart-wall probe previously passed.
-- `[8d7f80d9]` Entity-inside-block no-listener guards: Paper PR #14173; all 25 then-current call sites guarded and one-listener cobweb probe previously passed.
+The construction phase intentionally installed reasonable recorded candidates as independent commits before the separate audit.
 
-## Integration-round patches
+| Integration commit | Candidate | Source |
+|---|---|---|
+| `fd81dbac` | Chunk palette serialization compaction | Lithium PR #709, ishland, head `d258ae5c3d61a052017934b33de7db8be2153d4e`; JellySquid compaction; LGPL-3.0-only |
+| `211ea58c` | Bukkit scheduler timing wheel | Paper PR #13705, Intybyte, head `ac5875b377b33110164003a76bdcb53dd0ee477c`; GPL-3.0-only |
+| `004cd28e` | Copper golem queued path validation | Paper PR #13077, Jason Penilla, head `077c6b1bcbb9cfd1ec1391e760af21d955f61856`; GPL-3.0-only |
+| `9dbda85a` | Region-file tail-sector truncation | Paper PR #14209, Mattia, head `729ad0ab9eaf028e36c88358a29f99c93d6b84e0`; GPL-3.0-only |
+| `adf33d99` | Allocation-free map inventory matching | Independent adaptation of accepted Paper performance issue #9597 |
+| `fe1b4829` | Block-state face-support table deduplication | FerriteCore `BlockStateCacheImpl` inspiration at `0cef1f2a`; MIT |
 
-### `[fd81dbac]` Lithium chunk palette serialization
+Construction validation before audit:
 
-- Source: Lithium PR #709, ishland, head `d258ae5c3d61a052017934b33de7db8be2153d4e`; compaction implementation attributed to JellySquid; LGPL-3.0-only.
-- Effect: directly compacts packed palette indices, reuses 64/4096-entry thread-local buffers, avoids repacking an unchanged Lithium palette, and uses dense palette counters.
-- Integration evidence: applies and compiles; full Paperclip and zero-plugin startup passed. Chunk serialization round-trip/performance audit remains required.
+- All six candidates applied and compiled independently.
+- Full Paperclip build passed; intermediate SHA-256 `65A6B00677D4BC69F94531528BC2CB29061768B6636972539F14A74B258288B8`.
+- Zero-plugin startup reached `Done (9.486s)` with no `ERROR`/`FATAL`.
+- Paper PR #14209 region tests passed 5/5 after adding the repository-required Minecraft bootstrap fixture.
+- A scheduler probe passed ordinary FIFO `ABC`, repeating-task cancellation, delayed cancellation, and one async execution. The later independent audit found a skipped-tick defect that this ordinary test did not cover.
 
-### `[211ea58c]` Bukkit scheduler timing wheel
+## Independent audit
 
-- Source: Paper PR #13705, Intybyte, head `ac5875b377b33110164003a76bdcb53dd0ee477c`; GPL-3.0-only Paper attribution retained.
-- Effect: replaces sync and async pending priority queues with a 4096-slot timing wheel while preserving same-tick FIFO sorting and Leaf's level-tick-thread zero-delay path.
-- Integration evidence: applies and compiles. A targeted plugin passed FIFO `ABC`, three-run repeating cancellation, delayed cancellation, and one async execution; server exited normally with no `ERROR`/`FATAL`.
-- Audit focus: long delays spanning wheel rotations, late tasks, cancellation races, same-tick reentrancy, CMI/CMILib scheduler workloads, and whether the extra bucket/list allocation is a net win.
+Audit input was pushed commit `caa5b238de501a9742986738e565246ecbe1e2bd`. A new independent Performance / Correctness Reviewer reread the final Git state, performed risk-scaled checks, and was authorized to repair or revert experiments. It did not push.
 
-### `[004cd28e]` Copper golem queued path validation
+### Retained
 
-- Source: Paper PR #13077, Jason Penilla, head `077c6b1bcbb9cfd1ec1391e760af21d955f61856`; closed draft, GPL-3.0-only Paper attribution retained.
-- Effect: queued copper golems perform cheap target checks every tick but only create a new path every 60 ticks; travelling/interacting work still gets a full check before acting.
-- Integration evidence: applies, compiles, and survives full build/startup. Dedicated crowded-container behavior validation remains required.
-- Audit focus: changed queue responsiveness, target replacement, blocked containers, Purpur barrel/shulker options, and whether a closed draft belongs in the fork.
+| Experiment | Audit classification | Evidence |
+|---|---|---|
+| BlockFromToEvent fluid guard | **RETAIN — CHEAP WIN** | Live HandlerList check precedes wrapper/event construction; listener-present cancellation and dispatch remain unchanged. |
+| Vehicle update/move guards | **REWORK — completed and retained** | Audit found event-ordering/listener-registration bugs. `aa67676e` now captures boat endpoints before `VehicleUpdateEvent`; `cfdb11c2` rechecks move listeners after update callbacks for boats and minecarts. |
+| VehicleBlockCollisionEvent guard | **RETAIN — CHEAP WIN** | Dynamic guard precedes Bukkit wrapper work; existing one-listener minecart-wall probe passed. |
+| EntityInsideBlockEvent guards | **RETAIN — CHEAP WIN** | All 25 current call sites remain dynamically guarded; cancellation path is intact; existing cobweb listener probe passed. |
+| Region-file tail truncation (`9dbda85a`) | **RETAIN — SPECIALIZED WIN** | Write/header installation precedes freeing old sectors; write/clear/flush/close use the same monitor. Five targeted clear/replace/interior-hole/reopen/data-retention tests passed. This is a long-lived-world disk-space optimization, not a general tick claim. |
+| Map predicate allocation (`adf33d99`) | **RETAIN — CHEAP WIN** | Specialized inventory scan preserves item/map-id equality and inventory/equipment coverage. No cross-call cache, renderer suppression, or packet/frame semantic change. |
 
-### `[9dbda85a]` Region-file tail truncation
+### Reverted by the independent reviewer
 
-- Source: Paper PR #14209, Mattia, head `729ad0ab9eaf028e36c88358a29f99c93d6b84e0`; GPL-3.0-only Paper attribution retained.
-- Effect: after durable flush, truncates only unallocated physical tail sectors; interior holes remain available for normal reuse. Flush/clear/close are coordinated with writes.
-- Integration evidence: the PR's five targeted clear/replace/reopen/data-retention tests passed after adding the repository's required Minecraft bootstrap fixture. Applies, compiles, builds, and starts.
-- Audit focus: crash consistency, sync/DSYNC paths, header repair, oversized chunks, Moonrise I/O ownership, and whether space reclamation justifies extra force/truncate operations.
+| Experiment | Audit classification | Revert commit | Reason |
+|---|---|---|---|
+| AcquirePoi result collection | **REVERT** | `87381df1` | Existing exploratory pairs missed the frozen 5% gate and were inconsistent (`-0.78% / 3.42% / 1.57%` mean-MSPT direction); no justification to retain a previously failed candidate. |
+| `CraftItemStack.hasItemMeta()` fast path | **REVERT** | `b59aedf4` | Component-patch size is not a proven equivalent of all `CraftMetaItem.isEmpty()` subtype/default/removed-component semantics; no parity matrix or CMI evidence. |
+| Nitwit job-site behavior removal | **REVERT** | `e09bd184` | Removing the behavior also changes scheduling state, shared RNG draws, retry cleanup, debug visibility, and POI-section loading side effects. |
+| Chunk palette serialization | **REVERT** | `92d12b5f` | Persistent palette packing/raw reuse/count paths changed without local NBT round-trip parity or hotspot evidence; risk exceeded evidence. |
+| Scheduler timing wheel | **REVERT** | `470fd58b` | Focused reproducer proved that if management advances from tick 1 to tick 3, a task in skipped slot 2 waits a full wheel rotation. It also added 8192 bucket lists and due-list allocation/sort without hotspot evidence. |
+| Copper golem queued check | **REVERT** | `1e76d3c6` | Current state machine already avoids path creation while queued/interacting; the adaptation could validate an existing travelling path twice and did not materially defer missing-path creation. |
+| Block-state support-table dedup | **REVERT** | `246c02d0` | Every state still allocated a temporary array while a global `ConcurrentHashMap`, boxed keys, nodes, and unique arrays were retained. No heap/RSS/GC evidence showed a net memory win. |
 
-### `[adf33d99]` Allocation-free map inventory matching
-
-- Problem reference: accepted Paper performance issue #9597. Implementation is independent and intentionally narrower than cross-call map tracking deduplication.
-- Effect: replaces a capturing `Predicate<ItemStack>` allocation at each inventory scan with a specialized item/map-id scan.
-- Integration evidence: applies, compiles, builds, and starts. It does not cache across calls or alter frame/static decoration/renderer/packet cadence.
-- Audit focus: map-id equality, equipment coverage, empty stacks, and whether the added Inventory method is worth its maintenance cost.
-
-### `[fe1b4829]` Block-state face-support table deduplication
-
-- Source inspiration: FerriteCore `BlockStateCacheImpl` at `0cef1f2add1f1329aa6e690e8e292acd625c5c6d`, MIT.
-- Effect: encodes the 18 immutable support booleans and shares equal arrays across BlockStates. Moonrise collision-shape structures are not replaced.
-- Integration evidence: applies, compiles, builds, and starts.
-- Audit focus: retained heap delta versus the global concurrent map, bootstrap/reload lifecycle, publication, and whether this is a measured memory win rather than bookkeeping overhead.
+No item received **RETAIN — MEASURED WIN** in this audit. The retained event/map changes are locally strict work reductions; the region change has targeted correctness and specialized disk-space evidence, not a whole-server performance measurement.
 
 ## Classified without implementation
 
 ### Already covered
 
-- Lithium explosion hit-result factory and 16-cube shell rays: current Paper/Moonrise `ServerExplosion` already has boolean DDA exposure traversal, cached block data, and cached perimeter rays.
-- FerriteCore FastMap: Moonrise `PropertyAccessStateHolder` and `ZeroCollidingReferenceStateTable` already cover direct state/property lookup.
-- VehicleEntityCollisionEvent and BlockPhysicsEvent no-listener paths: existing Leaf guards.
-- Equipment clear subscription fix: current `EntityEquipment.clear()` invalidates subscriptions before replacement.
-- VMP no-flush/network tracker, Alternate Current, C2ME DFC, Pufferfish DAB/async spawning, Leaves/Lithium hopper and sleeping block entities: existing Leaf/Paper/Moonrise implementations.
-- Pathfinder synchronous chunk-load avoidance: `PathNavigationRegion` snapshots with `getChunkNow` and substitutes empty chunks rather than synchronously loading missing chunks.
-- ScalableLux and VMP async login chunk ideas: overlap Moonrise chunk/lighting ownership and are not independently portable.
+- Lithium explosion hit-result factory and 16-cube shell rays: Paper/Moonrise `ServerExplosion` already has boolean DDA exposure traversal, block caches, and cached perimeter rays.
+- FerriteCore FastMap: Moonrise `PropertyAccessStateHolder` and `ZeroCollidingReferenceStateTable` already provide direct state/property lookup.
+- VehicleEntityCollisionEvent and BlockPhysicsEvent listener fast paths: existing Leaf implementations.
+- Lithium equipment-clear subscription fix: current `EntityEquipment.clear()` invalidates subscriptions before replacement.
+- VMP no-flush/tracker, Alternate Current, C2ME DFC, Pufferfish DAB/async spawning, Leaves/Lithium hopper and sleeping block entity: existing Leaf/Paper/Moonrise paths.
+- Pathfinder synchronous chunk-load avoidance: `PathNavigationRegion` snapshots with `getChunkNow` and uses empty chunks for missing snapshots rather than synchronously loading them.
 
-### Obsolete, impossible, or not a transparent core optimization
+### Obsolete, impossible, or non-equivalent workload changes
 
-- Non-allocating voxel-shape and movement-cache experimental branches: stale/experimental and conflict with current Moonrise collision ownership.
-- ServerCore candidates with unresolved per-source license mapping: no code copied.
-- FarmControl, ViewDistanceTweaks, MobLimit, and Chunky: workload reduction/operations tools, not equivalent-work core optimizations.
-- Noisium 1.20-era worldgen cache and VMP 26.1 tracker/spawn delegates: version/architecture mismatch with current C2ME/Moonrise/Leaf paths.
+- Old experimental non-allocating voxel-shape and movement-cache branches conflict with current Moonrise collision ownership.
+- ServerCore candidates remain blocked by unresolved per-source license mapping; no code was copied.
+- ScalableLux/VMP async chunk ideas overlap Moonrise lighting/chunk lifecycle ownership and are not independently portable.
+- FarmControl, ViewDistanceTweaks, MobLimit, and Chunky reduce or move workload rather than optimize equivalent core work.
+- Noisium 1.20-era caches and VMP 26.1 spawn/tracker delegates do not match current C2ME/Moonrise/Leaf architecture.
 
-### Deferred only where a local correctness boundary is absent
+## Final verification
 
-- Full `MapItemSavedData#tickCarriedBy` per-map/player/tick deduplication: current state lacks a complete mutation epoch covering inventory components, player movement/visibility, frames, renderers, and immediate packet observation. Only the allocation-free scan was integrated.
-- FerriteCore collision-shape object deduplication: Moonrise mutates/caches shape internals; replacing or interning those shapes is not a local memory-layout patch.
-- Regionized multithreading/Folia scheduler/world ownership: explicitly outside project direction.
+- JDK: Azul Zulu `25.0.3+9-LTS`.
+- Final `applyAllPatches`: passed.
+- Final Paperclip build: passed.
+- Final Paperclip SHA-256: `B8934D565D3D3AE1AFC1A5430F90E5E173FDAE4F6F5F20CF75671EE044D9BA7F`.
+- Final fresh zero-plugin startup: `Initialized 0 plugins`, `Done (11.591s)`, clean delayed stop, exit `0`, no `ERROR`/`FATAL`.
+- Focused region persistence tests: 5/5 passed.
+- Timing-wheel skipped-tick reproducer: defect confirmed; patch reverted.
+- Full 8000+ suite, giant plugin matrix, copper crowd test, and palette torture test were intentionally not run.
 
-## Integration validation
+## Compatibility
 
-- JDK: Azul Zulu 25.
-- `applyAllPatches`: successful with patches through `0345`.
-- `leaf-server:createPaperclipJar`: successful.
-- Paperclip SHA-256: `65A6B00677D4BC69F94531528BC2CB29061768B6636972539F14A74B258288B8`.
-- Zero-plugin startup: `Initialized 0 plugins`, `Done (9.486s)`, no `ERROR`/`FATAL`.
-- Region-file PR test suite: 5/5 passed with bootstrap fixture.
-- Scheduler targeted plugin: `PASS order=ABC repeats=3 async=1`, clean exit, no `ERROR`/`FATAL`.
-- CMI / CMILib and optional LuckPerms/Vault/PlaceholderAPI/ProtocolLib: not yet exercised; independent audit must report this as unverified unless jars are present.
+No CMI, CMILib, LuckPerms, Vault, PlaceholderAPI, or ProtocolLib jars/configuration were found under `I:\MC_core`. Their compatibility is **unverified**, not assumed.
 
-## Audit instruction
+## Remaining candidates
 
-The integration commits are deliberately independently revertible. The independent reviewer should retain, repair, benchmark, or revert them without protecting implementation effort. No whole-server percentage or compatibility claim is made here.
+- A full `MapItemSavedData#tickCarriedBy` per-map/player/tick cache still lacks a complete mutation epoch for inventory components, movement/visibility, frames, renderers, and immediate packet observations. Only the allocation-free scan is retained.
+- Chunk serialization can be reconsidered only with a focused persistent-data round-trip oracle plus an actual serialization/I/O hotspot.
+- A different scheduler structure can be reconsidered only with measured `mainThreadHeartbeat`/pending-queue cost and explicit skipped-tick, long-delay, reentrancy, cancellation, ordering, and plugin parity.
+- FerriteCore-style cache compression needs retained-heap/RSS/GC evidence and a lifecycle-safe design that demonstrably saves more than its index structures.
+- Region truncation still lacks deliberate process-kill crash injection and a DSYNC/filesystem matrix; current source ordering and focused persistence tests support retention.
+
+Final retained experiment stack is intentionally smaller than the construction stack. Expensive complexity was removed where evidence did not justify it.
