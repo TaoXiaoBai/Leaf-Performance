@@ -1,0 +1,186 @@
+# Watches Leaf only; it never rewrites the Leaf-Performance branch.
+name: Leaf-Performance Upstream Watch
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: leaf-performance-upstream-watch-ver-26-2
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    name: Compare with Winds-Studio/Leaf ver/26.2
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out Leaf-Performance ver/26.2
+        uses: actions/checkout@v4
+        with:
+          ref: ver/26.2
+          fetch-depth: 0
+
+      - name: Fetch upstream Leaf
+        run: |
+          git remote add upstream https://github.com/Winds-Studio/Leaf.git
+          git fetch --no-tags upstream refs/heads/ver/26.2:refs/remotes/upstream/ver/26.2
+
+      - name: Record comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          fork_head=$(git rev-parse HEAD)
+          upstream_head=$(git rev-parse refs/remotes/upstream/ver/26.2)
+          old_base=$(git merge-base HEAD refs/remotes/upstream/ver/26.2)
+          ahead_count=$(git rev-list --count "${old_base}..${upstream_head}")
+
+          python3 - "$fork_head" "$old_base" "$upstream_head" "$ahead_count" <<'PY'
+          import json
+          import subprocess
+          import sys
+
+          fork_head, old_base, upstream_head, ahead_count = sys.argv[1:]
+          commits = subprocess.check_output(
+              ["git", "log", "--reverse", "--format=%H%x09%s", f"{old_base}..{upstream_head}"],
+              text=True,
+          ).splitlines()
+          with open("/tmp/leaf-performance-upstream-watch.json", "w", encoding="utf-8") as output:
+              json.dump(
+                  {
+                      "forkHead": fork_head,
+                      "oldBase": old_base,
+                      "upstreamHead": upstream_head,
+                      "aheadCount": int(ahead_count),
+                      "commits": commits,
+                  },
+                  output,
+              )
+          PY
+
+      - name: Create, update, or close tracking issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const data = JSON.parse(
+              fs.readFileSync("/tmp/leaf-performance-upstream-watch.json", "utf8"),
+            );
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const label = "upstream-watch";
+            const title = "[Upstream Watch] Leaf ver/26.2 updates available";
+            const syncedTitle = "[Upstream Watch] Leaf ver/26.2 synchronized";
+            const marker = "<!-- leaf-performance-upstream-watch:ver/26.2 -->";
+
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: label });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name: label,
+                color: "1d76db",
+                description: "Automated tracking of Winds-Studio/Leaf updates",
+              });
+            }
+
+            const candidates = await github.paginate(
+              github.rest.issues.listForRepo,
+              { owner, repo, state: "all", per_page: 100 },
+            );
+            const trackingIssues = candidates
+              .filter((issue) =>
+                !issue.pull_request &&
+                (issue.title === title || (issue.body || "").includes(marker)),
+              )
+              .sort((a, b) => a.number - b.number);
+            const issue = trackingIssues[0];
+            const duplicateIssues = trackingIssues.slice(1);
+
+            for (const duplicate of duplicateIssues) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: duplicate.number,
+                state: "closed",
+                state_reason: "not_planned",
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: duplicate.number,
+                body: issue
+                  ? `Closed as a duplicate of #${issue.number}; Upstream Watch maintains one tracking issue.`
+                  : "Closed because Upstream Watch maintains only one tracking issue.",
+              });
+            }
+
+            const summary = [
+              marker,
+              "This issue is maintained by the **Leaf-Performance Upstream Watch** workflow.",
+              "It is informational only: the workflow does not rebase, modify `ver/26.2`, or force-push.",
+              "",
+              `- Fork commit: \`${data.forkHead}\``,
+              `- Current upstream merge-base: \`${data.oldBase}\``,
+              `- Latest Winds-Studio/Leaf \`ver/26.2\`: \`${data.upstreamHead}\``,
+              `- New upstream commits: **${data.aheadCount}**`,
+              "",
+            ];
+
+            let body;
+            if (data.aheadCount > 0) {
+              const commitLines = data.commits.map((line) => {
+                const separator = line.indexOf("\t");
+                const sha = line.slice(0, separator);
+                const subject = line.slice(separator + 1);
+                const safeSubject = subject.replaceAll("`", "\\`");
+                return `- [\`${sha.slice(0, 12)}\`](https://github.com/Winds-Studio/Leaf/commit/${sha}) — ${safeSubject}`;
+              });
+              body = summary.concat([
+                "## Commits ahead of the current base",
+                "",
+                ...commitLines,
+                "",
+                `Last checked by [workflow run](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}).`,
+              ]).join("\n");
+
+              if (issue) {
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  title,
+                  body,
+                  state: "open",
+                  labels: [label],
+                });
+              } else {
+                await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+              }
+            } else if (issue) {
+              body = summary.concat([
+                "The fork currently contains the latest upstream Leaf commit. No sync action is pending.",
+                "",
+                `Last checked by [workflow run](${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}).`,
+              ]).join("\n");
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issue.number,
+                title: syncedTitle,
+                body,
+                state: "closed",
+                state_reason: "completed",
+                labels: [label],
+              });
+            } else {
+              core.info("Fork is synchronized and no tracking issue exists.");
+            }

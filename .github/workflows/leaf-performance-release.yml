@@ -1,0 +1,122 @@
+# Leaf-Performance releases are rebuilt from the selected tag and never use Leaf's download API.
+name: Leaf-Performance Release
+
+on:
+  push:
+    tags:
+      - "v26.2-lp.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing Leaf-Performance tag to build (v26.2-lp.*)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: leaf-performance-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and release Leaf-Performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Validate release tag
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v26\.2-lp\..+$ ]]; then
+            echo "Release tag must match v26.2-lp.*; got: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+      - name: Check out tagged Leaf-Performance source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: Verify checkout matches the tag
+        shell: bash
+        run: |
+          tag_commit=$(git rev-list -n 1 "$RELEASE_TAG")
+          head_commit=$(git rev-parse HEAD)
+          if [[ "$head_commit" != "$tag_commit" ]]; then
+            echo "Checked out $head_commit, but $RELEASE_TAG resolves to $tag_commit" >&2
+            exit 1
+          fi
+
+      - name: Fetch upstream Leaf provenance
+        run: |
+          git remote add upstream https://github.com/Winds-Studio/Leaf.git
+          git fetch --no-tags upstream refs/heads/ver/26.2:refs/remotes/upstream/ver/26.2
+
+      - name: Set up Zulu JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "25"
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Apply all patches
+        run: ./gradlew applyAllPatches --stacktrace --no-daemon
+
+      - name: Build Paperclip JAR from source
+        run: ./gradlew leaf-server:createPaperclipJar --stacktrace --no-daemon
+
+      - name: Prepare branded release files and notes
+        id: release_files
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          jars=(leaf-server/build/libs/leaf-paperclip-*.jar)
+          if (( ${#jars[@]} != 1 )); then
+            printf 'Expected exactly one Paperclip JAR, found %d\n' "${#jars[@]}" >&2
+            printf '%s\n' "${jars[@]}" >&2
+            exit 1
+          fi
+
+          fork_commit=$(git rev-parse HEAD)
+          upstream_base=$(git merge-base HEAD refs/remotes/upstream/ver/26.2)
+          jar_name="Leaf-Performance-${RELEASE_TAG}.jar"
+          cp "${jars[0]}" "$jar_name"
+          checksum=$(sha256sum "$jar_name" | awk '{print $1}')
+          printf '%s  %s\n' "$checksum" "$jar_name" > "${jar_name}.sha256"
+
+          cat > release-notes.md <<EOF
+          # Leaf-Performance ${RELEASE_TAG}
+
+          This is an **unofficial Leaf-Performance experimental build**. It is not an official Leaf release and is not endorsed by Winds-Studio/Leaf.
+
+          - Upstream Leaf base: \`${upstream_base}\`
+          - Leaf-Performance fork commit: \`${fork_commit}\`
+          - Paperclip JAR: \`${jar_name}\`
+          - SHA-256: \`${checksum}\`
+
+          The Paperclip JAR was rebuilt from the tagged Leaf-Performance source by GitHub Actions using Zulu JDK 25.
+          EOF
+
+          echo "jar=$jar_name" >> "$GITHUB_OUTPUT"
+          echo "checksum=${jar_name}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Create Leaf-Performance GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Leaf-Performance ${{ env.RELEASE_TAG }}
+          body_path: release-notes.md
+          files: |
+            ${{ steps.release_files.outputs.jar }}
+            ${{ steps.release_files.outputs.checksum }}
+          prerelease: ${{ contains(env.RELEASE_TAG, 'test') || contains(env.RELEASE_TAG, 'alpha') || contains(env.RELEASE_TAG, 'beta') || contains(env.RELEASE_TAG, 'rc') }}
+          fail_on_unmatched_files: true
