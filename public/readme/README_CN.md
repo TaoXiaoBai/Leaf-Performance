@@ -45,12 +45,22 @@ _目前 LOGO 还是文字。Profiler 尚未发现横幅渲染器里的热点。_
 
 Leaf 的 [bStats 页面](https://bstats.org/plugin/server-implementation/Leaf)、网站、文档、下载、Discord/QQ 社区、捐助页面、Maven 仓库及其他托管服务均属于上游 Leaf 项目。Leaf-Performance 不声称拥有单独的 bStats 服务或统计 ID；这些上游服务也不表示上游为本 Fork 提供支持或认可。
 
+## 🤖 CI 与发行版
+
+Leaf-Performance 使用 Fork 自己维护的 GitHub Actions，不复用 Leaf 官方的 Blacksmith、下载 API 或 Maven 发布设施：
+
+- [Leaf-Performance CI](https://github.com/TaoXiaoBai/Leaf-Performance/actions/workflows/leaf-performance-ci.yml) 使用 Zulu JDK 25 应用全部补丁、重新构建 Paperclip JAR，并上传为临时 workflow artifact。
+- [Upstream Watch](https://github.com/TaoXiaoBai/Leaf-Performance/actions/workflows/leaf-performance-upstream-watch.yml) 使用唯一 tracking Issue 报告 `Winds-Studio/Leaf` `ver/26.2` 的新提交；它不会自动 rebase，也不会修改或推送 Fork 分支。
+- [Leaf-Performance Releases](https://github.com/TaoXiaoBai/Leaf-Performance/releases) 从 `v26.2-lp.*` tag 对应源码重新构建，附带上游/Fork revision 与 SHA-256。它们是非官方 Leaf-Performance 实验构建，不是 Leaf 正式发行版。
+
+继承自 Leaf 的 workflow 文件继续保留 `Winds-Studio/Leaf` 仓库 guard，不会从本 Fork 发布内容。
+
 ## 📦 构建
 
 构建用于分发的 Paperclip JAR：
 
 ```bash
-./gradlew applyAllPatches && ./gradlew createPaperclipJar
+./gradlew applyAllPatches && ./gradlew leaf-server:createPaperclipJar
 ```
 
 ## 📦 API

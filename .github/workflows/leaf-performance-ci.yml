@@ -1,0 +1,71 @@
+# Leaf-Performance CI: intentionally independent from the inherited Leaf release jobs.
+name: Leaf-Performance CI
+
+on:
+  push:
+    branches:
+      - ver/26.2
+  pull_request:
+    branches:
+      - ver/26.2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leaf-performance-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Paperclip (JDK 25)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out Leaf-Performance
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Zulu JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "25"
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Apply all patches
+        run: ./gradlew applyAllPatches --stacktrace --no-daemon
+
+      - name: Build Paperclip JAR
+        run: ./gradlew leaf-server:createPaperclipJar --stacktrace --no-daemon
+
+      - name: Stage Leaf-Performance artifact
+        id: artifact
+        shell: bash
+        run: |
+          shopt -s nullglob
+          jars=(leaf-server/build/libs/leaf-paperclip-*.jar)
+          if (( ${#jars[@]} != 1 )); then
+            printf 'Expected exactly one Paperclip JAR, found %d\n' "${#jars[@]}" >&2
+            printf '%s\n' "${jars[@]}" >&2
+            exit 1
+          fi
+
+          mkdir -p artifacts
+          output="artifacts/Leaf-Performance-26.2-${GITHUB_SHA}.jar"
+          cp "${jars[0]}" "$output"
+          echo "path=$output" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Leaf-Performance Paperclip JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: Leaf-Performance-26.2-${{ github.sha }}
+          path: ${{ steps.artifact.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
