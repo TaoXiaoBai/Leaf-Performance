@@ -1,0 +1,115 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Thu, 12 Sep 2026 02:00:00 +0800
+Subject: [PATCH] Trim unused region file tail sectors
+
+Source: Paper PR #14209 by Mattia <mattiapearl@gmail.com>.
+Fixed head: 729ad0ab9eaf028e36c88358a29f99c93d6b84e0
+Original project: PaperMC/Paper
+License: GPL-3.0-only under Paper contribution terms.
+
+After forcing writes, truncate sectors that became unused at the physical end
+of a region file. Coordinate flush and close with writes and retain interior
+holes for normal sector reuse.
+diff --git a/net/minecraft/world/level/chunk/storage/RegionBitmap.java b/net/minecraft/world/level/chunk/storage/RegionBitmap.java
+index d44fd9ee..0c8cc31e 100644
+--- a/net/minecraft/world/level/chunk/storage/RegionBitmap.java
++++ b/net/minecraft/world/level/chunk/storage/RegionBitmap.java
+@@ -38,6 +38,11 @@ public class RegionBitmap {
+         this.used.clear(position, position + size);
+     }
+ 
++    // Leaf-Performance - Paper PR #14209 - expose the allocated file tail
++    int getUsedSectorEnd() {
++        return this.used.length();
++    }
++
+     public int allocate(final int size) {
+         int current = 0;
+ 
+
+diff --git a/net/minecraft/world/level/chunk/storage/RegionFile.java b/net/minecraft/world/level/chunk/storage/RegionFile.java
+index f564d0c9..ca69dd53 100644
+--- a/net/minecraft/world/level/chunk/storage/RegionFile.java
++++ b/net/minecraft/world/level/chunk/storage/RegionFile.java
+@@ -45,6 +45,7 @@ public class RegionFile implements AutoCloseable, ca.spottedleaf.moonrise.patche
+     private final IntBuffer timestamps;
+     @VisibleForTesting
+     protected final RegionBitmap usedSectors = new RegionBitmap();
++    private boolean needsTruncation; // Leaf-Performance - Paper PR #14209
+ 
+     // Paper start - Attempt to recalculate regionfile header if it is corrupt
+     private static long roundToSectors(long bytes) {
+@@ -527,6 +528,7 @@ public class RegionFile implements AutoCloseable, ca.spottedleaf.moonrise.patche
+             }
+             // Paper end
+         }
++        this.needsTruncation = this.file.size() > (long)this.usedSectors.getUsedSectorEnd() * SECTOR_BYTES; // Leaf-Performance - Paper PR #14209
+     }
+ 
+     public Path getPath() {
+@@ -773,11 +775,29 @@ public class RegionFile implements AutoCloseable, ca.spottedleaf.moonrise.patche
+         return new DataOutputStream(this.version.wrap(new RegionFile.ChunkBuffer(pos)));
+     }
+ 
+-    public void flush() throws IOException {
++    // Leaf-Performance start - Paper PR #14209 - trim unused tail sectors after durable writes
++    public synchronized void flush() throws IOException {
+         this.file.force(true);
++        if (!this.needsTruncation) {
++            return;
++        }
++
++        final long usedLength = (long)this.usedSectors.getUsedSectorEnd() * SECTOR_BYTES;
++        if (this.file.size() > usedLength) {
++            this.file.truncate(usedLength);
++            this.file.force(true);
++        }
++        this.needsTruncation = false;
++    }
++
++    private void freeSectors(final int position, final int size) {
++        final int previousEnd = this.usedSectors.getUsedSectorEnd();
++        this.usedSectors.free(position, size);
++        this.needsTruncation |= this.usedSectors.getUsedSectorEnd() < previousEnd;
+     }
++    // Leaf-Performance end - Paper PR #14209
+ 
+-    public void clear(final ChunkPos pos) throws IOException {
++    public synchronized void clear(final ChunkPos pos) throws IOException {
+         int offsetIndex = getOffsetIndex(pos);
+         int offset = this.offsets.get(offsetIndex);
+         if (offset != 0) {
+@@ -785,7 +805,7 @@ public class RegionFile implements AutoCloseable, ca.spottedleaf.moonrise.patche
+             this.timestamps.put(offsetIndex, getTimestamp());
+             this.writeHeader();
+             Files.deleteIfExists(this.getExternalChunkPath(pos));
+-            this.usedSectors.free(getSectorNumber(offset), getNumSectors(offset));
++            this.freeSectors(getSectorNumber(offset), getNumSectors(offset)); // Leaf-Performance - Paper PR #14209
+         }
+     }
+ 
+@@ -817,7 +837,7 @@ public class RegionFile implements AutoCloseable, ca.spottedleaf.moonrise.patche
+         this.writeHeader();
+         commitOp.run();
+         if (sectorNumber != 0) {
+-            this.usedSectors.free(sectorNumber, currentSectorCount);
++            this.freeSectors(sectorNumber, currentSectorCount); // Leaf-Performance - Paper PR #14209
+         }
+     }
+ 
+@@ -868,12 +888,12 @@ public class RegionFile implements AutoCloseable, ca.spottedleaf.moonrise.patche
+     }
+ 
+     @Override
+-    public void close() throws IOException {
++    public synchronized void close() throws IOException { // Leaf-Performance - Paper PR #14209
+         try {
+             this.padToFullSector();
+         } finally {
+             try {
+-                this.file.force(true);
++                this.flush(); // Leaf-Performance - Paper PR #14209
+             } finally {
+                 this.file.close();
+             }
