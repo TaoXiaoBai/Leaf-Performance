@@ -38,6 +38,13 @@ Current upstream base: `2aede50ca8250b0143b4779d8da1047f2dcf4c57`.
   - Evidence: JDK 25 patch/build validation; a one-listener minecart-wall probe observed the event, and a fresh-log zero-plugin startup reached `Done` with no `ERROR`/`FATAL`.
   - Decision: `RETAIN — CHEAP WIN / LOW MAINTENANCE`; no reliable whole-server percentage claimed.
 
+- `[975ca85b]` Entity-inside-block no-listener guards
+  - Source: Paper PR #14173, flennium, commit `947bb910`; GPL-3.0 attribution retained in the patch.
+  - Effect: skips entity/block wrappers and `EntityInsideBlockEvent` allocation at all 25 current Paper call sites when no listener exists.
+  - Risk: low behavioral complexity with moderate patch surface; listener-present dispatch/cancellation is unchanged and listener state is checked dynamically.
+  - Evidence: all 25 call sites guarded and no unguarded site remains; a one-listener cobweb probe observed the event; JDK 25 patch/build and zero-plugin startup passed.
+  - Decision: `RETAIN — CHEAP WIN`; no reliable whole-server percentage claimed.
+
 ## Deferred validation
 
 - Proper performance benchmarks and A/B comparison.
@@ -47,8 +54,8 @@ Current upstream base: `2aede50ca8250b0143b4779d8da1047f2dcf4c57`.
 
 ## Latest smoke note
 
-- JDK 25 `applyAllPatches` and `leaf-server:createPaperclipJar` succeeded after adding patch `0339`.
-- Paperclip SHA-256: `A5C75A18BBAA2D049083B6D0433554EE9931A7BCD69F2B7EBEBBA01C94E6DEC8`.
-- A targeted one-listener probe drove a minecart into a stone wall and observed `VehicleBlockCollisionEvent`; it exited cleanly without `ERROR`/`FATAL`.
-- A separate zero-plugin run initialized 0 plugins and reached `Done (9.648s)` with no `ERROR`/`FATAL`; the harness then stopped the owned process.
+- JDK 25 `applyAllPatches` and `leaf-server:createPaperclipJar` succeeded after adding patches `0339` and `0340`.
+- Paperclip SHA-256: `A6FD796A14060883C9782B080CEE525D24E64563DD34DA58945187AF4A3D84D6`.
+- Targeted one-listener probes observed both a minecart-wall `VehicleBlockCollisionEvent` and a cobweb `EntityInsideBlockEvent`; both exited cleanly without `ERROR`/`FATAL`.
+- A separate zero-plugin run initialized 0 plugins and reached `Done (9.504s)` with no `ERROR`/`FATAL`; the harness then stopped the owned process.
 - CMI / CMILib were not exercised for this low-risk event-allocation guard.
