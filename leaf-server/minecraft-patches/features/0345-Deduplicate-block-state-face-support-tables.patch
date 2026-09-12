@@ -1,0 +1,51 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Thu, 12 Sep 2026 03:00:00 +0800
+Subject: [PATCH] Deduplicate block-state face support tables
+
+Inspired by FerriteCore BlockStateCacheImpl at commit
+0cef1f2add1f1329aa6e690e8e292acd625c5c6d.
+Original project: https://github.com/malte0811/FerriteCore
+Original author/project license: MIT.
+Implementation independently adapted to Leaf 26.2 and limited to immutable
+face-sturdy boolean tables; Moonrise collision shapes are left untouched.
+
+Encode the 18 support booleans into an integer key during BlockState cache
+initialization and share identical immutable arrays between states.
+diff --git a/net/minecraft/world/level/block/state/BlockBehaviour.java b/net/minecraft/world/level/block/state/BlockBehaviour.java
+index 1929fa00..f13ddfec 100644
+--- a/net/minecraft/world/level/block/state/BlockBehaviour.java
++++ b/net/minecraft/world/level/block/state/BlockBehaviour.java
+@@ -1089,6 +1089,8 @@ public abstract class BlockBehaviour implements FeatureElement, net.caffeinemc.m
+             // Leaf start - Cache blockstate cache array
+             private static final SupportType[] SUPPORT_TYPE_VALUES = SupportType.values();
+             private static final Direction.Axis[] DIRECTION_AXIS_VALUES = Direction.Axis.values();
++            // Leaf-Performance - FerriteCore-inspired deduplication of the immutable face support table
++            private static final java.util.concurrent.ConcurrentHashMap<Integer, boolean[]> FACE_STURDY_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+             // Leaf end - Cache blockstate cache array
+             public final VoxelShape collisionShape;
+             public boolean largeCollisionShape;
+@@ -1116,13 +1118,20 @@ public abstract class BlockBehaviour implements FeatureElement, net.caffeinemc.m
+                     }
+                 }
+                 // Leaf end - Remove stream in BlockBehaviour cache blockstate
+-                this.faceSturdy = new boolean[DIRECTIONS.length * SUPPORT_TYPE_COUNT];
+-
++                // Leaf-Performance start - FerriteCore-inspired BlockState cache compression
++                final boolean[] computedFaceSturdy = new boolean[DIRECTIONS.length * SUPPORT_TYPE_COUNT];
++                int faceSturdyKey = 0;
+                 for (Direction direction : DIRECTIONS) {
+                     for (SupportType type : SUPPORT_TYPE_VALUES) { // Leaf - Cache blockstate cache array
+-                        this.faceSturdy[getFaceSupportIndex(direction, type)] = type.isSupporting(state, EmptyBlockGetter.INSTANCE, BlockPos.ZERO, direction);
++                        final int index = getFaceSupportIndex(direction, type);
++                        if (type.isSupporting(state, EmptyBlockGetter.INSTANCE, BlockPos.ZERO, direction)) {
++                            computedFaceSturdy[index] = true;
++                            faceSturdyKey |= 1 << index;
++                        }
+                     }
+                 }
++                this.faceSturdy = FACE_STURDY_CACHE.computeIfAbsent(faceSturdyKey, ignored -> computedFaceSturdy);
++                // Leaf-Performance end - FerriteCore-inspired BlockState cache compression
+ 
+                 this.isCollisionShapeFullBlock = Block.isShapeFullBlock(state.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO));
+             }
