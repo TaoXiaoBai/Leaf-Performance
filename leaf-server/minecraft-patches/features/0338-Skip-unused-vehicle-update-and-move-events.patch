@@ -17,26 +17,30 @@ diff --git a/net/minecraft/world/entity/vehicle/boat/AbstractBoat.java b/net/min
 index ad7b39f3..d67f6833 100644
 --- a/net/minecraft/world/entity/vehicle/boat/AbstractBoat.java
 +++ b/net/minecraft/world/entity/vehicle/boat/AbstractBoat.java
-@@ -275,14 +275,17 @@ public abstract class AbstractBoat extends VehicleEntity implements Leashable {
+@@ -275,14 +275,21 @@ public abstract class AbstractBoat extends VehicleEntity implements Leashable {
          }
  
          // CraftBukkit start
 -        org.bukkit.Location to = org.bukkit.craftbukkit.util.CraftLocation.toBukkit(this.position(), this.level(), this.getYRot(), this.getXRot());
++        final boolean hasUpdateListeners = org.bukkit.event.vehicle.VehicleUpdateEvent.getHandlerList().getRegisteredListeners().length != 0;
++        boolean hasMoveListeners = org.bukkit.event.vehicle.VehicleMoveEvent.getHandlerList().getRegisteredListeners().length != 0;
++        // Capture before VehicleUpdateEvent: its handlers may move the boat or change VehicleMoveEvent registration.
++        org.bukkit.Location to = hasUpdateListeners || hasMoveListeners
++            ? org.bukkit.craftbukkit.util.CraftLocation.toBukkit(this.position(), this.level(), this.getYRot(), this.getXRot())
++            : null;
          org.bukkit.entity.Vehicle vehicle = (org.bukkit.entity.Vehicle) this.getBukkitEntity();
  
 -        new org.bukkit.event.vehicle.VehicleUpdateEvent(vehicle).callEvent();
-+        if (org.bukkit.event.vehicle.VehicleUpdateEvent.getHandlerList().getRegisteredListeners().length != 0) {
++        if (hasUpdateListeners) {
 +            new org.bukkit.event.vehicle.VehicleUpdateEvent(vehicle).callEvent();
++            hasMoveListeners = org.bukkit.event.vehicle.VehicleMoveEvent.getHandlerList().getRegisteredListeners().length != 0;
 +        }
  
 -        if (this.lastLocation != null && !this.lastLocation.equals(to)) {
 -            org.bukkit.event.vehicle.VehicleMoveEvent event = new org.bukkit.event.vehicle.VehicleMoveEvent(vehicle, this.lastLocation, to);
 -            event.callEvent();
-+        if (org.bukkit.event.vehicle.VehicleMoveEvent.getHandlerList().getRegisteredListeners().length != 0) {
-+            org.bukkit.Location to = org.bukkit.craftbukkit.util.CraftLocation.toBukkit(this.position(), this.level(), this.getYRot(), this.getXRot());
-+            if (this.lastLocation != null && !this.lastLocation.equals(to)) {
-+                new org.bukkit.event.vehicle.VehicleMoveEvent(vehicle, this.lastLocation, to).callEvent();
-+            }
++        if (hasMoveListeners && this.lastLocation != null && !this.lastLocation.equals(to)) {
++            new org.bukkit.event.vehicle.VehicleMoveEvent(vehicle, this.lastLocation, to).callEvent();
          }
          this.lastLocation = vehicle.getLocation();
          // CraftBukkit end
