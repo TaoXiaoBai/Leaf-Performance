@@ -45,12 +45,22 @@ These records describe controlled machines and workloads. They are not universal
 
 Leaf's [bStats page](https://bstats.org/plugin/server-implementation/Leaf), website, documentation, downloads, Discord/QQ communities, donation pages, Maven repository and other hosted services belong to the upstream Leaf project. Leaf-Performance does not claim a separate bStats service or statistics ID, and those services must not be read as upstream support or endorsement of this fork.
 
+## 🤖 CI and releases
+
+Leaf-Performance uses fork-owned GitHub Actions rather than Leaf's official Blacksmith, download API, or Maven-publishing infrastructure:
+
+- [Leaf-Performance CI](https://github.com/TaoXiaoBai/Leaf-Performance/actions/workflows/leaf-performance-ci.yml) applies all patches, builds a fresh Paperclip JAR on Zulu JDK 25, and publishes it as a temporary workflow artifact.
+- [Upstream Watch](https://github.com/TaoXiaoBai/Leaf-Performance/actions/workflows/leaf-performance-upstream-watch.yml) reports new `Winds-Studio/Leaf` `ver/26.2` commits in one tracking issue. It never rebases or pushes the fork branch.
+- [Leaf-Performance releases](https://github.com/TaoXiaoBai/Leaf-Performance/releases) are rebuilt from `v26.2-lp.*` tags and include upstream/fork provenance plus a SHA-256 checksum. They are unofficial Leaf-Performance experimental builds, not Leaf releases.
+
+Inherited Leaf workflow files remain guarded for `Winds-Studio/Leaf` and intentionally do not publish anything from this fork.
+
 ## 📦 Building
 
 Building a Paperclip JAR for distribution:
 
 ```bash
-./gradlew applyAllPatches && ./gradlew createPaperclipJar
+./gradlew applyAllPatches && ./gradlew leaf-server:createPaperclipJar
 ```
 
 ## 📦 API
