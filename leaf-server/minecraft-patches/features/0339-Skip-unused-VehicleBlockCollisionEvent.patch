@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Sat, 12 Sep 2026 22:20:00 +0800
+Subject: [PATCH] Skip VehicleBlockCollisionEvent without listeners
+
+Avoid all Bukkit vehicle, block, and velocity wrapper work for horizontal
+vehicle collisions when no plugin listens to VehicleBlockCollisionEvent.
+Listener-present dispatch and event data remain unchanged.
+
+Based on Paper PR #14173 by flennium, commit 947bb910. This adaptation moves
+the dynamic listener check before the wrapper conversions instead of guarding
+only event construction.
+License: GPL-3.0; attribution retained per Paper contribution terms.
+Decision: RETAIN - CHEAP WIN / LOW MAINTENANCE.
+
+---
+ net/minecraft/world/entity/Entity.java | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 0ac10f8283ebf0f897a9df1c6ec0e4bd7a2f732b..4182527403344eba75b3d7bdc300174fea188e34 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -1356,7 +1356,9 @@ public abstract class Entity
+                     this.restituteMovementAfterCollisions(effectState, xCollision, zCollision, movement);
+                 }
+                 // CraftBukkit start
+-                if (this.horizontalCollision && this.getBukkitEntity() instanceof org.bukkit.entity.Vehicle) {
++                if (this.horizontalCollision
++                    && org.bukkit.event.vehicle.VehicleBlockCollisionEvent.getHandlerList().getRegisteredListeners().length != 0
++                    && this.getBukkitEntity() instanceof org.bukkit.entity.Vehicle) { // Leaf-Performance - skip unused vehicle collision wrappers and event
+                     org.bukkit.entity.Vehicle vehicle = (org.bukkit.entity.Vehicle) this.getBukkitEntity();
+                     org.bukkit.block.Block block = this.level.getWorld().getBlockAt(Mth.floor(this.getX()), Mth.floor(this.getY()), Mth.floor(this.getZ()));
+ 
+-- 
+2.55.0.windows.5
