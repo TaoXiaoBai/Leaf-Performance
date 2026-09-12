@@ -49,7 +49,7 @@ diff --git a/net/minecraft/world/entity/vehicle/minecart/AbstractMinecart.java b
 index 03e029e9..f2a76486 100644
 --- a/net/minecraft/world/entity/vehicle/minecart/AbstractMinecart.java
 +++ b/net/minecraft/world/entity/vehicle/minecart/AbstractMinecart.java
-@@ -328,15 +328,21 @@ public abstract class AbstractMinecart extends VehicleEntity {
+@@ -328,15 +328,22 @@ public abstract class AbstractMinecart extends VehicleEntity {
          // this.handlePortal(); // CraftBukkit - handled in postTick
          this.behavior.tick();
          // CraftBukkit start
@@ -60,7 +60,7 @@ index 03e029e9..f2a76486 100644
 -
 -        new org.bukkit.event.vehicle.VehicleUpdateEvent(vehicle).callEvent();
 +        final boolean hasUpdateListeners = org.bukkit.event.vehicle.VehicleUpdateEvent.getHandlerList().getRegisteredListeners().length != 0;
-+        final boolean hasMoveListeners = org.bukkit.event.vehicle.VehicleMoveEvent.getHandlerList().getRegisteredListeners().length != 0;
++        boolean hasMoveListeners = org.bukkit.event.vehicle.VehicleMoveEvent.getHandlerList().getRegisteredListeners().length != 0;
 +        if (hasUpdateListeners || hasMoveListeners) {
 +            org.bukkit.World bworld = this.level().getWorld();
 +            org.bukkit.Location from = new org.bukkit.Location(bworld, prevX, prevY, prevZ, prevYaw, prevPitch);
@@ -69,6 +69,7 @@ index 03e029e9..f2a76486 100644
 +
 +            if (hasUpdateListeners) {
 +                new org.bukkit.event.vehicle.VehicleUpdateEvent(vehicle).callEvent();
++                hasMoveListeners = org.bukkit.event.vehicle.VehicleMoveEvent.getHandlerList().getRegisteredListeners().length != 0;
 +            }
  
 -        if (!from.equals(to)) {
