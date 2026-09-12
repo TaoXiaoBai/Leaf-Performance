@@ -39,6 +39,11 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Configure Git identity for patch application
+        run: |
+          git config --global user.name "Leaf-Performance CI"
+          git config --global user.email "actions@users.noreply.github.com"
+
       - name: Apply all patches
         run: ./gradlew applyAllPatches --stacktrace --no-daemon
 
