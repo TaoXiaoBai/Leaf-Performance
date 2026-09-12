@@ -1,0 +1,342 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Sat, 12 Sep 2026 23:40:00 +0800
+Subject: [PATCH] Skip EntityInsideBlockEvent without listeners
+
+Avoid constructing Bukkit entity/block wrappers and EntityInsideBlockEvent at
+all 25 Paper call sites when no plugin has registered a listener. The listener
+check remains dynamic, while listener-present dispatch and cancellation
+semantics are unchanged.
+
+Source: Paper PR #14173 by flennium, commit 947bb910.
+License: GPL-3.0; attribution retained per Paper contribution terms.
+Decision: RETAIN - CHEAP WIN; trivial per-site logic with moderate patch
+surface, no whole-server percentage claimed.
+
+---
+ 25 files changed, 25 insertions(+), 25 deletions(-)
+diff --git a/net/minecraft/world/level/block/BaseFireBlock.java b/net/minecraft/world/level/block/BaseFireBlock.java
+index 108549a88185af83b0c2d41b8ce6db32159c8002..bdc82e2c858d4b9e23a85712f323dbc5cad2fd27 100644
+--- a/net/minecraft/world/level/block/BaseFireBlock.java
++++ b/net/minecraft/world/level/block/BaseFireBlock.java
+@@ -136,7 +136,7 @@ public abstract class BaseFireBlock extends Block {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         effectApplier.apply(InsideBlockEffectType.CLEAR_FREEZE);
+         effectApplier.apply(InsideBlockEffectType.FIRE_IGNITE);
+         effectApplier.runAfter(InsideBlockEffectType.FIRE_IGNITE, e -> e.hurt(e.level().damageSources().inFire(), this.fireDamage));
+diff --git a/net/minecraft/world/level/block/BasePressurePlateBlock.java b/net/minecraft/world/level/block/BasePressurePlateBlock.java
+index f2d7c5fc0339a62c4fc56aa5871cd999e1136ca6..9ded4366fb2dacc85534ce734aa47aabde9f4e91 100644
+--- a/net/minecraft/world/level/block/BasePressurePlateBlock.java
++++ b/net/minecraft/world/level/block/BasePressurePlateBlock.java
+@@ -90,7 +90,7 @@ public abstract class BasePressurePlateBlock extends Block {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (!level.isClientSide()) {
+             int signal = this.getSignalForState(state);
+             if (signal == 0) {
+diff --git a/net/minecraft/world/level/block/BigDripleafBlock.java b/net/minecraft/world/level/block/BigDripleafBlock.java
+index 515a9e98e960ffde78e1b25a26d6f8c2f634def9..692964104129d96a3fb0fedf8c2308b21f0831de 100644
+--- a/net/minecraft/world/level/block/BigDripleafBlock.java
++++ b/net/minecraft/world/level/block/BigDripleafBlock.java
+@@ -195,7 +195,7 @@ public class BigDripleafBlock extends HorizontalDirectionalBlock implements Simp
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (!level.isClientSide()) {
+             if (state.getValue(TILT) == Tilt.NONE && canEntityTilt(pos, entity) && !level.hasNeighborSignal(pos)) {
+                 // CraftBukkit start - tilt dripleaf
+diff --git a/net/minecraft/world/level/block/BubbleColumnBlock.java b/net/minecraft/world/level/block/BubbleColumnBlock.java
+index 25920f40864d4ae297c43c85b077ee4d0aac5f1d..e40d6606db13a17a62266ceb08f9b992caaad0db 100644
+--- a/net/minecraft/world/level/block/BubbleColumnBlock.java
++++ b/net/minecraft/world/level/block/BubbleColumnBlock.java
+@@ -58,7 +58,7 @@ public class BubbleColumnBlock extends Block implements BucketPickup {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (isPrecise) {
+             BlockState stateAbove = level.getBlockState(pos.above());
+             boolean nothingAbove = stateAbove.getCollisionShape(level, pos).isEmpty() && stateAbove.getFluidState().isEmpty();
+diff --git a/net/minecraft/world/level/block/ButtonBlock.java b/net/minecraft/world/level/block/ButtonBlock.java
+index 9c859b04519f78988e765a164cf39cd8a99447df..afb0136d9935b7a31b16692b5fd3de7db544d900 100644
+--- a/net/minecraft/world/level/block/ButtonBlock.java
++++ b/net/minecraft/world/level/block/ButtonBlock.java
+@@ -169,7 +169,7 @@ public class ButtonBlock extends FaceAttachedHorizontalDirectionalBlock {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (!level.isClientSide() && this.type.canButtonBeActivatedByArrows() && !state.getValue(POWERED)) {
+             this.checkPressed(state, level, pos);
+         }
+diff --git a/net/minecraft/world/level/block/CactusBlock.java b/net/minecraft/world/level/block/CactusBlock.java
+index dd4d113263ba74eb0f773d2188753567044ef522..c81c1724430b57f6858fc4902a037fd5487c72fd 100644
+--- a/net/minecraft/world/level/block/CactusBlock.java
++++ b/net/minecraft/world/level/block/CactusBlock.java
+@@ -157,7 +157,7 @@ public class CactusBlock extends Block implements BonemealableBlock { // Purpur
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         entity.hurt(level.damageSources().cactus().eventBlockDamager(level, pos), 1.0F); // CraftBukkit
+     }
+ 
+diff --git a/net/minecraft/world/level/block/CampfireBlock.java b/net/minecraft/world/level/block/CampfireBlock.java
+index 2f7c1e3fb63174cfa44422da9b0d9c49c8a22bc8..f606ad8cecc4844c76430f6a1db585af5344d32c 100644
+--- a/net/minecraft/world/level/block/CampfireBlock.java
++++ b/net/minecraft/world/level/block/CampfireBlock.java
+@@ -121,7 +121,7 @@ public class CampfireBlock extends BaseEntityBlock implements SimpleWaterloggedB
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (state.getValue(LIT) && entity instanceof LivingEntity) {
+             entity.hurt(level.damageSources().campfire().eventBlockDamager(level, pos), this.fireDamage); // CraftBukkit
+         }
+diff --git a/net/minecraft/world/level/block/CropBlock.java b/net/minecraft/world/level/block/CropBlock.java
+index 0dfb632b339b24564744b1f5c0d52d7fed66d265..fa229fb4e5a290cf5ddf08268f9abc8cf8ecdc7a 100644
+--- a/net/minecraft/world/level/block/CropBlock.java
++++ b/net/minecraft/world/level/block/CropBlock.java
+@@ -176,7 +176,7 @@ public class CropBlock extends VegetationBlock implements BonemealableBlock {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (level instanceof ServerLevel serverLevel && entity instanceof Ravager && serverLevel.purpurConfig.ravagerGriefableBlocks.contains(serverLevel.getBlockState(pos).getBlock()) && org.bukkit.craftbukkit.event.CraftEventFactory.callEntityChangeBlockEvent(entity, pos, Blocks.AIR.defaultBlockState(), !serverLevel.getGameRules().get(GameRules.MOB_GRIEFING, serverLevel.purpurConfig.ravagerMobGriefingOverride))) { // CraftBukkit // Purpur - Configurable ravager griefable blocks list // Purpur - Add mobGriefing override to everything affected
+             serverLevel.destroyBlock(pos, true, entity);
+         }
+diff --git a/net/minecraft/world/level/block/DetectorRailBlock.java b/net/minecraft/world/level/block/DetectorRailBlock.java
+index 0caf401ef2e4f8646e429a476993ba06ee405445..1d6676d5aaa6df4f92f8d9fa01e186c9679154bd 100644
+--- a/net/minecraft/world/level/block/DetectorRailBlock.java
++++ b/net/minecraft/world/level/block/DetectorRailBlock.java
+@@ -62,7 +62,7 @@ public class DetectorRailBlock extends BaseRailBlock {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (!level.isClientSide()) {
+             if (!state.getValue(POWERED)) {
+                 this.checkPressed(level, pos, state);
+diff --git a/net/minecraft/world/level/block/EndGatewayBlock.java b/net/minecraft/world/level/block/EndGatewayBlock.java
+index 67941c19d97a328dfce7eeecf52518349f27df81..39263b3a85f5186e3b75d1d4323a3e94c5bf76c4 100644
+--- a/net/minecraft/world/level/block/EndGatewayBlock.java
++++ b/net/minecraft/world/level/block/EndGatewayBlock.java
+@@ -94,7 +94,7 @@ public class EndGatewayBlock extends BaseEntityBlock implements Portal {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (entity.canUsePortal(false)
+             && !level.isClientSide()
+             && level.getBlockEntity(pos) instanceof TheEndGatewayBlockEntity endGatewayBlockEntity
+diff --git a/net/minecraft/world/level/block/EndPortalBlock.java b/net/minecraft/world/level/block/EndPortalBlock.java
+index 2d48b70e18547330078e49c8f01f2f39b08d274c..e25c1542408f6db008595392d139ecf84ce82dec 100644
+--- a/net/minecraft/world/level/block/EndPortalBlock.java
++++ b/net/minecraft/world/level/block/EndPortalBlock.java
+@@ -66,7 +66,7 @@ public class EndPortalBlock extends BaseEntityBlock implements Portal {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (entity.canUsePortal(false)) {
+             // CraftBukkit start - Entity in portal
+             org.bukkit.event.entity.EntityPortalEnterEvent event = new org.bukkit.event.entity.EntityPortalEnterEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.util.CraftLocation.toBukkit(pos, level), org.bukkit.PortalType.ENDER); // Paper - add portal type
+diff --git a/net/minecraft/world/level/block/EyeblossomBlock.java b/net/minecraft/world/level/block/EyeblossomBlock.java
+index a2c0369e1abc45d57a5431dc224495a00bb82b5c..64de2aa3f79cba9e42f4a288a974d2b7df144a83 100644
+--- a/net/minecraft/world/level/block/EyeblossomBlock.java
++++ b/net/minecraft/world/level/block/EyeblossomBlock.java
+@@ -106,7 +106,7 @@ public class EyeblossomBlock extends FlowerBlock {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (!level.isClientSide()
+             && level.getDifficulty() != Difficulty.PEACEFUL
+             && entity instanceof Bee bee
+diff --git a/net/minecraft/world/level/block/FrogspawnBlock.java b/net/minecraft/world/level/block/FrogspawnBlock.java
+index 701a1c80e91dc5c0517819f3af55c1473979b039..7421236d484b599abb79a4bb4b7ace41d2fe9611 100644
+--- a/net/minecraft/world/level/block/FrogspawnBlock.java
++++ b/net/minecraft/world/level/block/FrogspawnBlock.java
+@@ -99,7 +99,7 @@ public class FrogspawnBlock extends Block {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (entity.is(EntityTypes.FALLING_BLOCK)) {
+             this.destroyBlock(level, pos);
+         }
+diff --git a/net/minecraft/world/level/block/HoneyBlock.java b/net/minecraft/world/level/block/HoneyBlock.java
+index 2e0dc3c38a700293ec3c199c3fdaa8dd5885e225..82310e2645b2b55ae0b1fabe8c24dc995933519d 100644
+--- a/net/minecraft/world/level/block/HoneyBlock.java
++++ b/net/minecraft/world/level/block/HoneyBlock.java
+@@ -70,7 +70,7 @@ public class HoneyBlock extends HalfTransparentBlock {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (this.isSlidingDown(pos, entity)) {
+             this.maybeDoSlideAchievement(entity, pos);
+             this.doSlideMovement(entity);
+diff --git a/net/minecraft/world/level/block/HopperBlock.java b/net/minecraft/world/level/block/HopperBlock.java
+index 7bf75794fcf9697b302123b18e967bbc99783053..f49738874865e05b4d3e44f5635dafc584fc3826 100644
+--- a/net/minecraft/world/level/block/HopperBlock.java
++++ b/net/minecraft/world/level/block/HopperBlock.java
+@@ -179,7 +179,7 @@ public class HopperBlock extends BaseEntityBlock implements net.caffeinemc.mods.
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (level.getBlockEntity(pos) instanceof HopperBlockEntity hopperBlockEntity) {
+             HopperBlockEntity.entityInside(level, pos, state, entity, hopperBlockEntity);
+         }
+diff --git a/net/minecraft/world/level/block/LavaCauldronBlock.java b/net/minecraft/world/level/block/LavaCauldronBlock.java
+index 3ce6f15ea0a197b8c7c87009b75fa77215eddcb7..0ddbd9f5781bf3bda07ad49fc57684aee426d59f 100644
+--- a/net/minecraft/world/level/block/LavaCauldronBlock.java
++++ b/net/minecraft/world/level/block/LavaCauldronBlock.java
+@@ -52,7 +52,7 @@ public class LavaCauldronBlock extends AbstractCauldronBlock {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         BlockPos savedPos = pos.immutable(); // Paper - track lava contact
+         effectApplier.apply(InsideBlockEffectType.CLEAR_FREEZE);
+         effectApplier.apply(InsideBlockEffectType.LAVA_IGNITE);
+diff --git a/net/minecraft/world/level/block/LayeredCauldronBlock.java b/net/minecraft/world/level/block/LayeredCauldronBlock.java
+index 49781ad04cbcc861f4e5fbf04a6213c43b4bb544..4a7f053c4bc67209a19726081eefc75ba3d72934 100644
+--- a/net/minecraft/world/level/block/LayeredCauldronBlock.java
++++ b/net/minecraft/world/level/block/LayeredCauldronBlock.java
+@@ -90,7 +90,7 @@ public class LayeredCauldronBlock extends AbstractCauldronBlock {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (level instanceof ServerLevel serverLevel) {
+             BlockPos blockPos = pos.immutable();
+             effectApplier.runBefore(InsideBlockEffectType.EXTINGUISH, e -> {
+diff --git a/net/minecraft/world/level/block/LilyPadBlock.java b/net/minecraft/world/level/block/LilyPadBlock.java
+index bb4a0214c6f0598185d44d2ea0f79aa3dde5d4c4..709a3a7ac5b9d987ec851be49447eca833cb1a2b 100644
+--- a/net/minecraft/world/level/block/LilyPadBlock.java
++++ b/net/minecraft/world/level/block/LilyPadBlock.java
+@@ -39,7 +39,7 @@ public class LilyPadBlock extends VegetationBlock {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         super.entityInside(state, level, pos, entity, effectApplier, isPrecise);
+         if (level instanceof ServerLevel && entity instanceof AbstractBoat) {
+             // CraftBukkit start
+diff --git a/net/minecraft/world/level/block/NetherPortalBlock.java b/net/minecraft/world/level/block/NetherPortalBlock.java
+index 0e07cdfebc7127e720ea4ff61324374e1589db91..e3911370d10b897dbb1291ef3a5cd9b69498438f 100644
+--- a/net/minecraft/world/level/block/NetherPortalBlock.java
++++ b/net/minecraft/world/level/block/NetherPortalBlock.java
+@@ -121,7 +121,7 @@ public class NetherPortalBlock extends Block implements Portal {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (entity.canUsePortal(false)) {
+             // CraftBukkit start - Entity in portal
+             org.bukkit.event.entity.EntityPortalEnterEvent event = new org.bukkit.event.entity.EntityPortalEnterEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.util.CraftLocation.toBukkit(pos, level), org.bukkit.PortalType.NETHER); // Paper - add portal type
+diff --git a/net/minecraft/world/level/block/PitcherCropBlock.java b/net/minecraft/world/level/block/PitcherCropBlock.java
+index 74d118ba1a96e1ce3eb0037aca7afdd2569ddb1f..f25e69a7dd06ef765c2c2ecefd23e44f86890699 100644
+--- a/net/minecraft/world/level/block/PitcherCropBlock.java
++++ b/net/minecraft/world/level/block/PitcherCropBlock.java
+@@ -125,7 +125,7 @@ public class PitcherCropBlock extends DoublePlantBlock implements BonemealableBl
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (level instanceof ServerLevel serverLevel && entity instanceof Ravager && serverLevel.getGameRules().get(GameRules.MOB_GRIEFING)) {
+             serverLevel.destroyBlock(pos, true, entity);
+         }
+diff --git a/net/minecraft/world/level/block/PowderSnowBlock.java b/net/minecraft/world/level/block/PowderSnowBlock.java
+index 564376c2da94257db2c7251def664fb990f708b5..37e258e718e705e2d34cde98efdc3e0ee61212cd 100644
+--- a/net/minecraft/world/level/block/PowderSnowBlock.java
++++ b/net/minecraft/world/level/block/PowderSnowBlock.java
+@@ -68,7 +68,7 @@ public class PowderSnowBlock extends Block implements BucketPickup {
+         final boolean isPrecise
+     ) {
+         // Paper start - Add EntityInsideBlockEvent
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) {
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) {
+             if (entity instanceof net.minecraft.server.level.ServerPlayer player) {
+                 player.resendPossiblyDesyncedDataValues(java.util.List.of(net.minecraft.world.entity.Entity.DATA_TICKS_FROZEN), player); // prevent desync on cancelled event
+             }
+diff --git a/net/minecraft/world/level/block/SweetBerryBushBlock.java b/net/minecraft/world/level/block/SweetBerryBushBlock.java
+index a7620f67e95eef30bed4dfbe19afbe1c995f694f..e2fb5b4c5ac58f42467d2ac6ef82b82b3a3ee2e9 100644
+--- a/net/minecraft/world/level/block/SweetBerryBushBlock.java
++++ b/net/minecraft/world/level/block/SweetBerryBushBlock.java
+@@ -87,7 +87,7 @@ public class SweetBerryBushBlock extends VegetationBlock implements Bonemealable
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (entity instanceof LivingEntity && !entity.is(EntityTypes.FOX) && !entity.is(EntityTypes.BEE)) {
+             entity.makeStuckInBlock(state, new Vec3(0.8F, 0.75, 0.8F));
+             if (level instanceof ServerLevel serverLevel && state.getValue(AGE) != 0) {
+diff --git a/net/minecraft/world/level/block/TripWireBlock.java b/net/minecraft/world/level/block/TripWireBlock.java
+index 49510dc0ef82621953be8e485708872bd8b2b88b..5daa2539fecfb5d91f6e525de03f5c02e642993e 100644
+--- a/net/minecraft/world/level/block/TripWireBlock.java
++++ b/net/minecraft/world/level/block/TripWireBlock.java
+@@ -161,7 +161,7 @@ public class TripWireBlock extends Block {
+         final boolean isPrecise
+     ) {
+         if (io.papermc.paper.configuration.GlobalConfiguration.get().blockUpdates.disableTripwireUpdates) return; // Paper - prevent tripwires from detecting collision
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (!level.isClientSide()) {
+             if (!state.getValue(POWERED) && !level.getBlockTicks().hasScheduledTick(pos, this)) {
+                 this.checkPressed(level, pos, List.of(entity));
+diff --git a/net/minecraft/world/level/block/WebBlock.java b/net/minecraft/world/level/block/WebBlock.java
+index cae80183c36b00c54b2f85c21fc7b5c02021a584..4a8c3e4de72509460c3de6203d7c897c861441e5 100644
+--- a/net/minecraft/world/level/block/WebBlock.java
++++ b/net/minecraft/world/level/block/WebBlock.java
+@@ -32,7 +32,7 @@ public class WebBlock extends Block {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         Vec3 speedMultiplier = new Vec3(0.25, 0.05F, 0.25);
+         if (entity instanceof LivingEntity livingEntity && livingEntity.hasEffect(MobEffects.WEAVING)) {
+             speedMultiplier = new Vec3(0.5, 0.25, 0.5);
+diff --git a/net/minecraft/world/level/block/WitherRoseBlock.java b/net/minecraft/world/level/block/WitherRoseBlock.java
+index 6c9d309bd087e6ebfb86f22b05fe5fd705af421f..75f82d9b74648bf6e89f742375513763647e1fab 100644
+--- a/net/minecraft/world/level/block/WitherRoseBlock.java
++++ b/net/minecraft/world/level/block/WitherRoseBlock.java
+@@ -72,7 +72,7 @@ public class WitherRoseBlock extends FlowerBlock {
+         final InsideBlockEffectApplier effectApplier,
+         final boolean isPrecise
+     ) {
+-        if (!new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
++        if (io.papermc.paper.event.entity.EntityInsideBlockEvent.getHandlerList().getRegisteredListeners().length != 0 && !new io.papermc.paper.event.entity.EntityInsideBlockEvent(entity.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(level, pos)).callEvent()) { return; } // Paper - Add EntityInsideBlockEvent
+         if (level instanceof ServerLevel serverLevel
+             && level.getDifficulty() != Difficulty.PEACEFUL
+             && entity instanceof LivingEntity livingEntity
