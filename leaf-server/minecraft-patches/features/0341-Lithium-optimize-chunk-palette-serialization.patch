@@ -1,0 +1,201 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: TaoXiaoBai <taoxiaobai@users.noreply.github.com>
+Date: Thu, 12 Sep 2026 00:00:00 +0800
+Subject: [PATCH] Lithium: optimize chunk palette serialization
+
+Based on Lithium PR #709, commit d258ae5c3d61a052017934b33de7db8be2153d4e.
+Original PR author: ishland <ishlandmc@yeah.net>
+Original compaction implementation: JellySquid
+Original project: https://github.com/CaffeineMC/lithium
+Licensed under: LGPL-3.0-only
+
+Reuse fixed-size per-thread buffers, compact packed palette indices directly,
+avoid repacking unchanged Lithium palettes, and use dense counters for the
+small palettes used by chunk sections.
+diff --git a/net/minecraft/util/SimpleBitStorage.java b/net/minecraft/util/SimpleBitStorage.java
+index a6ebcfd0..831c7383 100644
+--- a/net/minecraft/util/SimpleBitStorage.java
++++ b/net/minecraft/util/SimpleBitStorage.java
+@@ -1,10 +1,13 @@
+ package net.minecraft.util;
+ 
+ import java.util.function.IntConsumer;
++import net.caffeinemc.mods.lithium.common.world.chunk.CompactingPackedIntegerArray;
++import net.minecraft.world.level.chunk.Palette;
++import net.minecraft.world.level.chunk.PaletteResize;
+ import org.apache.commons.lang3.Validate;
+ import org.jspecify.annotations.Nullable;
+ 
+-public class SimpleBitStorage implements BitStorage {
++public class SimpleBitStorage implements BitStorage, CompactingPackedIntegerArray {
+     private static final int[] MAGIC = new int[]{
+         -1,
+         -1,
+@@ -337,6 +340,37 @@ public class SimpleBitStorage implements BitStorage {
+         // Paper end - optimise bitstorage read/write operations
+     }
+ 
++    // Leaf start - Lithium - optimize chunk palette serialization
++    @Override
++    public <T> void lithium$compact(final Palette<T> sourcePalette, final Palette<T> destinationPalette, final short[] output) {
++        if (this.size != output.length) {
++            throw new IllegalStateException("Array size mismatch");
++        }
++
++        final PaletteResize<T> noResizeExpected = PaletteResize.noResizeExpected();
++        final short[] mappings = new short[(int)(this.mask + 1L)];
++        int outputIndex = 0;
++
++        for (final long packedWord : this.data) {
++            long remaining = packedWord;
++            for (int elementIndex = 0; elementIndex < this.valuesPerLong; elementIndex++) {
++                final int value = (int)(remaining & this.mask);
++                int remappedId = mappings[value];
++                if (remappedId == 0) {
++                    remappedId = destinationPalette.idFor(sourcePalette.valueFor(value), noResizeExpected) + 1;
++                    mappings[value] = (short)remappedId;
++                }
++
++                output[outputIndex++] = (short)(remappedId - 1);
++                if (outputIndex >= this.size) {
++                    return;
++                }
++                remaining >>>= this.bits;
++            }
++        }
++    }
++    // Leaf end - Lithium - optimize chunk palette serialization
++
+     @Override
+     public long[] getRaw() {
+         return this.data;
+
+diff --git a/net/minecraft/world/level/chunk/PalettedContainer.java b/net/minecraft/world/level/chunk/PalettedContainer.java
+index 0b0282ef..c65bcb31 100644
+--- a/net/minecraft/world/level/chunk/PalettedContainer.java
++++ b/net/minecraft/world/level/chunk/PalettedContainer.java
+@@ -13,6 +13,8 @@ import java.util.Optional;
+ import java.util.function.Consumer;
+ import java.util.function.Predicate;
+ import java.util.stream.LongStream;
++import net.caffeinemc.mods.lithium.common.world.chunk.CompactingPackedIntegerArray;
++import net.caffeinemc.mods.lithium.common.world.chunk.LithiumHashPalette;
+ import net.minecraft.core.IdMap;
+ import net.minecraft.network.FriendlyByteBuf;
+ import net.minecraft.util.BitStorage;
+@@ -24,6 +26,10 @@ import org.jspecify.annotations.Nullable;
+ 
+ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T> {
+     private static final int MIN_PALETTE_BITS = 0;
++    // Leaf start - Lithium - optimize chunk palette serialization
++    private static final ThreadLocal<short[]> COMPACTION_ARRAY_4096 = ThreadLocal.withInitial(() -> new short[4096]);
++    private static final ThreadLocal<short[]> COMPACTION_ARRAY_64 = ThreadLocal.withInitial(() -> new short[64]);
++    // Leaf end - Lithium - optimize chunk palette serialization
+     public volatile PalettedContainer.Data<T> data; // Paper - optimise collisions - public
+     private final Strategy<T> strategy;
+     private final T @Nullable [] presetValues; // Paper - Anti-Xray - Add preset values
+@@ -368,28 +374,53 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
+ 
+     @Override
+     public synchronized PalettedContainerRO.PackedData<T> pack(final Strategy<T> strategy) { // Paper - synchronize
++        // Leaf start - Lithium - optimize chunk palette serialization
+         this.acquire();
+-
+         try {
+-            BitStorage currentStorage = this.data.storage;
+-            Palette<T> currentPalette = this.data.palette;
+-            HashMapPalette<T> newPalette = new HashMapPalette<>(currentStorage.getBits());
+-            int entryCount = strategy.entryCount();
+-            int[] newContents = reencodeContents(currentStorage, currentPalette, newPalette);
+-            Configuration storedConfiguration = strategy.getConfigurationForPaletteSize(newPalette.getSize());
+-            int bitsOnDisc = storedConfiguration.bitsInStorage();
+-            Optional<LongStream> values;
+-            if (bitsOnDisc != 0) {
+-                SimpleBitStorage storage = new SimpleBitStorage(bitsOnDisc, entryCount, newContents);
+-                values = Optional.of(Arrays.stream(storage.getRaw()));
+-            } else {
+-                values = Optional.empty();
++            final Palette<T> currentPalette = this.data.palette();
++            final BitStorage currentStorage = this.data.storage();
++            if (currentStorage instanceof ZeroBitStorage || currentPalette.getSize() == 1) {
++                return new PalettedContainerRO.PackedData<>(List.of(currentPalette.valueFor(0)), Optional.empty(), 0);
++            }
++
++            final LithiumHashPalette<T> compactedPalette = new LithiumHashPalette<>(currentStorage.getBits());
++            final short[] compactedContents = getCompactionArray(strategy.entryCount());
++            ((CompactingPackedIntegerArray)currentStorage).lithium$compact(currentPalette, compactedPalette, compactedContents);
++
++            final Configuration storedConfiguration = strategy.getConfigurationForPaletteSize(compactedPalette.getSize());
++            final int bitsOnDisc = storedConfiguration.bitsInStorage();
++            if (currentPalette instanceof LithiumHashPalette<T> lithiumPalette
++                && lithiumPalette.getSize() == compactedPalette.getSize()
++                && !storedConfiguration.alwaysRepack()
++                && currentStorage.getBits() == bitsOnDisc) {
++                return new PalettedContainerRO.PackedData<>(
++                    lithiumPalette.getElements(), Optional.of(Arrays.stream(currentStorage.getRaw().clone())), bitsOnDisc
++                );
++            }
++
++            if (bitsOnDisc == 0) {
++                return new PalettedContainerRO.PackedData<>(compactedPalette.getElements(), Optional.empty(), 0);
+             }
+ 
+-            return new PalettedContainerRO.PackedData<>(newPalette.getEntries(), values, bitsOnDisc);
++            final SimpleBitStorage packedStorage = new SimpleBitStorage(bitsOnDisc, compactedContents.length);
++            for (int index = 0; index < compactedContents.length; index++) {
++                packedStorage.set(index, compactedContents[index]);
++            }
++            return new PalettedContainerRO.PackedData<>(
++                compactedPalette.getElements(), Optional.of(Arrays.stream(packedStorage.getRaw())), bitsOnDisc
++            );
+         } finally {
+             this.release();
+         }
++        // Leaf end - Lithium - optimize chunk palette serialization
++    }
++
++    private static short[] getCompactionArray(final int size) {
++        return switch (size) {
++            case 64 -> COMPACTION_ARRAY_64.get();
++            case 4096 -> COMPACTION_ARRAY_4096.get();
++            default -> new short[size];
++        };
+     }
+ 
+     private static <T> int[] reencodeContents(final BitStorage storage, final Palette<T> oldPalette, final Palette<T> newPalette) {
+@@ -446,13 +477,29 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
+ 
+     @Override
+     public void count(final PalettedContainer.CountConsumer<T> output) {
+-        if (this.data.palette.getSize() == 1) {
+-            output.accept(this.data.palette.valueFor(0), this.data.storage.getSize());
+-        } else {
+-            Int2IntOpenHashMap counts = new Int2IntOpenHashMap();
+-            this.data.storage.getAll(state -> counts.addTo(state, 1));
+-            counts.int2IntEntrySet().forEach(entry -> output.accept(this.data.palette.valueFor(entry.getIntKey()), entry.getIntValue()));
++        final PalettedContainer.Data<T> currentData = this.data;
++        final int paletteSize = currentData.palette().getSize();
++        if (paletteSize == 1) {
++            output.accept(currentData.palette().valueFor(0), currentData.storage().getSize());
++            return;
+         }
++
++        // Leaf start - Lithium - optimize chunk palette serialization
++        if (paletteSize <= 4096) {
++            final short[] counts = new short[paletteSize];
++            currentData.storage().getAll(index -> counts[index]++);
++            for (int index = 0; index < counts.length; index++) {
++                if (counts[index] != 0) {
++                    output.accept(currentData.palette().valueFor(index), counts[index]);
++                }
++            }
++            return;
++        }
++        // Leaf end - Lithium - optimize chunk palette serialization
++
++        final Int2IntOpenHashMap counts = new Int2IntOpenHashMap();
++        currentData.storage().getAll(state -> counts.addTo(state, 1));
++        counts.int2IntEntrySet().forEach(entry -> output.accept(currentData.palette().valueFor(entry.getIntKey()), entry.getIntValue()));
+     }
+ 
+     @FunctionalInterface
