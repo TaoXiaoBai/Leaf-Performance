@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 07:00:00 +0800
+Subject: [PATCH] Narrow framed-map holder scans
+
+For framed map updates, process only the holder associated with the current
+viewer instead of rescanning every map holder for every viewer. Handheld and
+dropped-map calls keep the complete holder scan; renderer, decoration, frame,
+and packet update paths remain unchanged.
+
+Source: Lithium 26.1.x entity.framed_maps MapItemSavedDataMixin, 2No2Name,
+revision 701fb2e7636c6d634c76380c11232d27fd578dff.
+License: LGPL-3.0-only; adapted to current Leaf/Paper map tracking.
+
+diff --git a/net/minecraft/world/level/saveddata/maps/MapItemSavedData.java b/net/minecraft/world/level/saveddata/maps/MapItemSavedData.java
+index 53b4dff..3b892f4 100644
+--- a/net/minecraft/world/level/saveddata/maps/MapItemSavedData.java
++++ b/net/minecraft/world/level/saveddata/maps/MapItemSavedData.java
+@@ -209,8 +209,13 @@ public class MapItemSavedData extends SavedData {
+             this.removeDecoration(tickingPlayer.getPlainTextName());
+         }
+ 
+-        for (int i = 0; i < this.carriedBy.size(); i++) {
+-            MapItemSavedData.HoldingPlayer otherHoldingPlayer = this.carriedBy.get(i);
++        // Leaf-Performance start - Lithium - avoid framed map viewer x holder scans
++        int holdingPlayerCount = placedInFrame == null ? this.carriedBy.size() : 1;
++        for (int i = 0; i < holdingPlayerCount; i++) {
++            MapItemSavedData.HoldingPlayer otherHoldingPlayer = placedInFrame == null
++                ? this.carriedBy.get(i)
++                : this.carriedByPlayers.get(tickingPlayer);
++            // Leaf-Performance end - Lithium - avoid framed map viewer x holder scans
+             Player otherPlayer = otherHoldingPlayer.player;
+             String otherPlayerName = otherPlayer.getPlainTextName();
+             if (!otherPlayer.isRemoved() && (placedInFrame != null || otherPlayer.getInventory().containsMap(mapItem, mapId))) {
