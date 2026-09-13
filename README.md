@@ -1,117 +1,65 @@
 # Leaf-Performance
 
-<div align="center">
+**Leaf-Performance** is a private experimental performance fork of [Leaf](https://github.com/Winds-Studio/Leaf), currently tracking **`ver/26.2`**.
 
-**[LOGO PLACEHOLDER]**
-
-_The logo is still text. The profiler has not found a hot path in the banner renderer._
-
-</div>
-
-> [!IMPORTANT]
-> **Leaf-Performance is an unofficial, private experimental fork based on [Leaf](https://github.com/Winds-Studio/Leaf).** It is not a Leaf release, is not endorsed by the Leaf maintainers, and fork-specific bugs belong in the [Leaf-Performance issue tracker](https://github.com/TaoXiaoBai/Leaf-Performance/issues), not upstream.
-
-This repository is a personal performance workbench with a small amount of bad taste included free of charge. Measure first, change one thing at a time, and throw the patch into the bin when the numbers say “premium placebo.” No invented TPS, no decorative percentages, and no imaginary speed crown.
+It is not an official Leaf release and is not endorsed or supported by the Leaf maintainers. Fork-specific issues belong in the [Leaf-Performance issue tracker](https://github.com/TaoXiaoBai/Leaf-Performance/issues), not upstream.
 
 **English** | [中文](public/readme/README_CN.md)
 
-## 🧪 Scope and policy
+## Project scope
 
-- Tracks the upstream Leaf **`ver/26.2`** line. Versions before 26.2 are not currently planned.
-- Stays in the Paper-style server model. This is **not a Folia clone**, and thread-model changes are not free speed.
-- Full plugin compatibility is not the first priority. Vanilla/Paper behavior and plugin-facing contracts remain the default unless an experiment explicitly documents and tests a trade-off.
-- Performance work starts with a reproducible workload and profiler evidence. At most one main optimization is evaluated at a time, with no more than two tightly related small changes.
-- The same-condition A/B record should include average MSPT, P50/P95/P99, CPU, allocation, GC and contention where applicable. A change with no credible benefit, a regression, unsafe concurrency, or merely shifted work with higher total CPU is removed.
-- Runtime safety, lifecycle rules, snapshots, unknown chunk semantics, completed work and queues are not benchmark fuel. Resource-for-latency trades need an explicit budget.
-- Back up worlds before testing. This fork may be opinionated; your only production world should not be part of the experiment.
+Leaf-Performance is a place to test focused server optimizations on top of Leaf. It keeps the Paper-style server model and does not attempt to become a Folia clone.
 
-## 🧾 Experiment records
+> **Keep cheap wins. Expensive complexity must earn its keep.**
 
-> Experimental performance patches are currently being integrated. Strict benchmarking and compatibility audits are deferred to a later audit round.
+- Small, local changes may be retained when they clearly remove work or allocation, preserve behavior, and remain easy to maintain.
+- Complex caches, lifecycle changes, concurrency, and asynchronous work require stronger correctness arguments and workload-specific measurements.
+- Changes already covered by Leaf, Paper, or Moonrise are not carried locally.
+- Negative optimizations, unsafe concurrency, stale-state risks, and complexity without credible benefit are removed.
+- No invented TPS figures, decorative percentages, or universal performance claims.
 
-- [Round 1 baseline and limitations](docs/performance/round-1-baseline.md)
-- [Round 2 external candidate/source audit](docs/performance/round-2/candidates.md)
+## Compatibility
 
-These records describe controlled machines and workloads. They are not universal public-server claims, and an upstream author's benchmark is not a benchmark of this fork.
+Full plugin compatibility is not the first priority, but breaking established Vanilla, Bukkit, Paper, or Leaf behavior for a minor optimization is not acceptable by default. Event parity, threading assumptions, persistent data, player lifecycle, and common plugin-facing paths are reviewed according to the risk of each change.
 
-## 🔗 Project links
+Back up worlds before testing experimental builds. This repository is a development workbench, not a drop-in promise for every production server.
 
-- **Fork issues:** <https://github.com/TaoXiaoBai/Leaf-Performance/issues>
-- **Upstream Leaf source:** <https://github.com/Winds-Studio/Leaf>
-- **Upstream documentation:** <https://www.leafmc.one/docs/getting-started>
-- **Upstream releases:** <https://github.com/Winds-Studio/Leaf/releases>
+## Experiment records
 
-## 📈 Upstream services
+Performance decisions and rejected approaches are recorded under [`docs/performance/`](docs/performance/). The current retained/reverted candidate summary is in [`docs/performance/pending-audit.md`](docs/performance/pending-audit.md).
 
-Leaf's [bStats page](https://bstats.org/plugin/server-implementation/Leaf), website, documentation, downloads, Discord/QQ communities, donation pages, Maven repository and other hosted services belong to the upstream Leaf project. Leaf-Performance does not claim a separate bStats service or statistics ID, and those services must not be read as upstream support or endorsement of this fork.
+These records apply to specific revisions and workloads. Results from an upstream project do not automatically describe this fork.
 
-## 🤖 CI and releases
+## Build
 
-Leaf-Performance uses fork-owned GitHub Actions rather than Leaf's official Blacksmith, download API, or Maven-publishing infrastructure:
-
-- [Leaf-Performance CI](https://github.com/TaoXiaoBai/Leaf-Performance/actions/workflows/leaf-performance-ci.yml) applies all patches, builds a fresh Paperclip JAR on Zulu JDK 25, and publishes it as a temporary workflow artifact.
-- [Upstream Watch](https://github.com/TaoXiaoBai/Leaf-Performance/actions/workflows/leaf-performance-upstream-watch.yml) reports new `Winds-Studio/Leaf` `ver/26.2` commits in one tracking issue. It never rebases or pushes the fork branch.
-- [Leaf-Performance releases](https://github.com/TaoXiaoBai/Leaf-Performance/releases) are rebuilt from `v26.2-lp.*` tags and include upstream/fork provenance plus a SHA-256 checksum. They are unofficial Leaf-Performance experimental builds, not Leaf releases.
-
-Inherited Leaf workflow files remain guarded for `Winds-Studio/Leaf` and intentionally do not publish anything from this fork.
-
-## 📦 Building
-
-Building a Paperclip JAR for distribution:
+Leaf-Performance requires JDK 25.
 
 ```bash
-./gradlew applyAllPatches && ./gradlew leaf-server:createPaperclipJar
+./gradlew applyAllPatches
+./gradlew leaf-server:createPaperclipJar
 ```
 
-## 📦 API
+## CI and releases
 
-<details>
-<summary>Click to expand</summary>
+This fork uses its own GitHub Actions and does not depend on Leaf's official Blacksmith runners, download API, secrets, or Maven publication pipeline.
 
-### Gradle
+- [Leaf-Performance CI](https://github.com/TaoXiaoBai/Leaf-Performance/actions/workflows/leaf-performance-ci.yml) applies patches, builds a Paperclip JAR on Zulu JDK 25, and uploads the JAR as a workflow artifact.
+- [Upstream Watch](https://github.com/TaoXiaoBai/Leaf-Performance/actions/workflows/leaf-performance-upstream-watch.yml) reports new `Winds-Studio/Leaf` `ver/26.2` commits without rebasing or pushing this fork.
+- [Leaf-Performance releases](https://github.com/TaoXiaoBai/Leaf-Performance/releases) are rebuilt from `v26.2-lp.*` tags and include source provenance plus a SHA-256 checksum.
 
-```kotlin
-repositories {
-  maven {
-    // This repository is operated by upstream Leaf.
-    url = uri("https://maven.leafmc.one/snapshots/")
-  }
-}
+Inherited Leaf workflow files remain guarded for `Winds-Studio/Leaf` and do not publish from this repository.
 
-dependencies {
-    compileOnly("cn.dreeam.leaf:leaf-api:26.2.local-SNAPSHOT")
-}
+## Links
 
-java {
-  toolchain.languageVersion.set(JavaLanguageVersion.of(25))
-}
-```
+- [Leaf-Performance issues](https://github.com/TaoXiaoBai/Leaf-Performance/issues)
+- [Leaf source](https://github.com/Winds-Studio/Leaf)
+- [Leaf documentation](https://www.leafmc.one/docs/getting-started)
+- [Leaf releases](https://github.com/Winds-Studio/Leaf/releases)
 
-### Maven
+Leaf's website, documentation, communities, downloads, bStats page, Maven repository, and other hosted services belong to the upstream Leaf project. Their presence does not imply support for or endorsement of this fork.
 
-```xml
-<repository>
-    <id>leafmc</id>
-    <url>https://maven.leafmc.one/snapshots/</url>
-</repository>
-```
+## Provenance and licenses
 
-```xml
-<dependency>
-    <groupId>cn.dreeam.leaf</groupId>
-    <artifactId>leaf-api</artifactId>
-    <version>26.2.local-SNAPSHOT</version>
-    <scope>provided</scope>
-</dependency>
-```
+Leaf-Performance is derived from Leaf, which includes work from Paper and other open-source projects. Source-file and patch headers remain authoritative for authorship and licensing. Preserve all required copyright notices, license headers, and attribution when adapting external work.
 
-</details>
-
-## ⚖️ Upstream provenance and licenses
-
-Leaf-Performance is derived from Leaf, which in turn carries code and patches from Paper and other projects. This is provenance and licensing information, not a claim that those projects helped, sponsored, reviewed, or endorsed this private fork.
-
-- Primary upstream: [Leaf](https://github.com/Winds-Studio/Leaf)
-- Major upstream/source projects represented in Leaf include [Paper](https://github.com/PaperMC/Paper), [Gale](https://github.com/GaleMC/Gale), [Pufferfish](https://github.com/pufferfish-gg/Pufferfish), [Purpur](https://github.com/PurpurMC/Purpur), [Leaves](https://github.com/LeavesMC/Leaves), [Moonrise](https://github.com/Tuinity/Moonrise), [Lithium](https://github.com/CaffeineMC/lithium), [C2ME](https://github.com/RelativityMC/C2ME-fabric), [SparklyPaper](https://github.com/SparklyPower/SparklyPaper), [Luminol](https://github.com/LuminolMC/Luminol), [Sakura](https://github.com/Samsuik/Sakura) and others identified by source-file or patch headers.
-
-Leaf inherits multiple open-source licenses from its upstream projects. Preserve all copyright notices, source/patch headers and attribution required by those licenses. See [LICENSE.md](LICENSE.md) for the repository-level summary and the applicable source headers for exact terms.
+See [LICENSE.md](LICENSE.md) for the repository-level license summary.
