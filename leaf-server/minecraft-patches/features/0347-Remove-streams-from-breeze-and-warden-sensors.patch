@@ -1,0 +1,121 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 07:00:00 +0800
+Subject: [PATCH] Remove streams from attack sensors
+
+Replace short-lived Optional/Stream pipelines with direct iteration in the
+Breeze and Warden attack sensors. Warden still performs a player-first pass
+followed by a non-player pass, preserving priority and encounter order.
+
+License: GPL-3.0-only as part of the distributed Leaf server patch stack.
+
+diff --git a/net/minecraft/world/entity/ai/sensing/BreezeAttackEntitySensor.java b/net/minecraft/world/entity/ai/sensing/BreezeAttackEntitySensor.java
+index 4c035ed..996ad4c 100644
+--- a/net/minecraft/world/entity/ai/sensing/BreezeAttackEntitySensor.java
++++ b/net/minecraft/world/entity/ai/sensing/BreezeAttackEntitySensor.java
+@@ -2,11 +2,11 @@ package net.minecraft.world.entity.ai.sensing;
+ 
+ import com.google.common.collect.ImmutableSet;
+ import com.google.common.collect.Iterables;
+-import java.util.Collection;
+ import java.util.List;
+ import java.util.Set;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.world.entity.EntitySelector;
++import net.minecraft.world.entity.LivingEntity;
+ import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+ import net.minecraft.world.entity.monster.breeze.Breeze;
+ 
+@@ -19,16 +19,19 @@ public class BreezeAttackEntitySensor extends NearestLivingEntitySensor<Breeze>
+     @Override
+     protected void doTick(final ServerLevel level, final Breeze breeze) {
+         super.doTick(level, breeze);
+-        breeze.getBrain()
+-            .getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES)
+-            .stream()
+-            .flatMap(Collection::stream)
+-            .filter(EntitySelector.NO_CREATIVE_OR_SPECTATOR)
+-            .filter(entity -> Sensor.isEntityAttackable(level, breeze, entity))
+-            .findFirst()
+-            .ifPresentOrElse(
+-                entity -> breeze.getBrain().setMemory(MemoryModuleType.NEAREST_ATTACKABLE, entity),
+-                () -> breeze.getBrain().eraseMemory(MemoryModuleType.NEAREST_ATTACKABLE)
+-            );
++        var brain = breeze.getBrain();
++        LivingEntity nearestAttackable = null;
++        for (LivingEntity entity : brain.getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES).orElse(List.of())) {
++            if (EntitySelector.NO_CREATIVE_OR_SPECTATOR.test(entity) && Sensor.isEntityAttackable(level, breeze, entity)) {
++                nearestAttackable = entity;
++                break;
++            }
++        }
++
++        if (nearestAttackable != null) {
++            brain.setMemory(MemoryModuleType.NEAREST_ATTACKABLE, nearestAttackable);
++        } else {
++            brain.eraseMemory(MemoryModuleType.NEAREST_ATTACKABLE);
++        }
+     }
+ }
+diff --git a/net/minecraft/world/entity/ai/sensing/WardenEntitySensor.java b/net/minecraft/world/entity/ai/sensing/WardenEntitySensor.java
+index 78a5d26..d6b8816 100644
+--- a/net/minecraft/world/entity/ai/sensing/WardenEntitySensor.java
++++ b/net/minecraft/world/entity/ai/sensing/WardenEntitySensor.java
+@@ -2,16 +2,14 @@ package net.minecraft.world.entity.ai.sensing;
+ 
+ import com.google.common.collect.ImmutableSet;
+ import com.google.common.collect.Iterables;
+-import java.util.Collection;
+ import java.util.List;
+-import java.util.Optional;
+ import java.util.Set;
+-import java.util.function.Predicate;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.world.entity.EntityTypes;
+ import net.minecraft.world.entity.LivingEntity;
+ import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+ import net.minecraft.world.entity.monster.warden.Warden;
++import org.jspecify.annotations.Nullable;
+ 
+ public class WardenEntitySensor extends NearestLivingEntitySensor<Warden> {
+     @Override
+@@ -22,21 +20,25 @@ public class WardenEntitySensor extends NearestLivingEntitySensor<Warden> {
+     @Override
+     protected void doTick(final ServerLevel level, final Warden body) {
+         super.doTick(level, body);
+-        getClosest(body, e -> e.is(EntityTypes.PLAYER))
+-            .or(() -> getClosest(body, e -> !e.is(EntityTypes.PLAYER)))
+-            .ifPresentOrElse(
+-                entity -> body.getBrain().setMemory(MemoryModuleType.NEAREST_ATTACKABLE, entity),
+-                () -> body.getBrain().eraseMemory(MemoryModuleType.NEAREST_ATTACKABLE)
+-            );
++        List<LivingEntity> nearestEntities = body.getBrain().getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES).orElse(List.of());
++        LivingEntity nearestAttackable = getClosest(body, nearestEntities, true);
++        if (nearestAttackable == null) {
++            nearestAttackable = getClosest(body, nearestEntities, false);
++        }
++
++        if (nearestAttackable != null) {
++            body.getBrain().setMemory(MemoryModuleType.NEAREST_ATTACKABLE, nearestAttackable);
++        } else {
++            body.getBrain().eraseMemory(MemoryModuleType.NEAREST_ATTACKABLE);
++        }
+     }
+ 
+-    private static Optional<LivingEntity> getClosest(final Warden body, final Predicate<LivingEntity> test) {
+-        return body.getBrain()
+-            .getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES)
+-            .stream()
+-            .flatMap(Collection::stream)
+-            .filter(body::canTargetEntity)
+-            .filter(test)
+-            .findFirst();
++    private static @Nullable LivingEntity getClosest(final Warden body, final List<LivingEntity> nearestEntities, final boolean player) {
++        for (LivingEntity entity : nearestEntities) {
++            if (body.canTargetEntity(entity) && entity.is(EntityTypes.PLAYER) == player) {
++                return entity;
++            }
++        }
++        return null;
+     }
+ }
