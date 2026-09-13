@@ -1,0 +1,76 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 07:00:00 +0800
+Subject: [PATCH] Avoid TemptingSensor fallback allocations
+
+Select the nearest valid player directly in the custom-predicate fallback
+instead of allocating and sorting a temporary list. Filter order, stable
+equal-distance selection, Bukkit target event behavior, and the optimized
+global lookup path remain unchanged.
+
+Source inspiration: Lithium 26.1.x ai.sensor.replace_streams.tempting,
+2No2Name, revision 701fb2e7636c6d634c76380c11232d27fd578dff.
+License: LGPL-3.0-only; independently adapted to current Leaf 26.2.
+
+diff --git a/net/minecraft/world/entity/ai/sensing/TemptingSensor.java b/net/minecraft/world/entity/ai/sensing/TemptingSensor.java
+index fbb3ed2..5fb8492 100644
+--- a/net/minecraft/world/entity/ai/sensing/TemptingSensor.java
++++ b/net/minecraft/world/entity/ai/sensing/TemptingSensor.java
+@@ -1,12 +1,9 @@
+ package net.minecraft.world.entity.ai.sensing;
+ 
+ import com.google.common.collect.ImmutableSet;
+-import java.util.Comparator;
+-import java.util.List;
+ import java.util.Set;
+ import java.util.function.BiPredicate;
+ import java.util.function.Predicate;
+-import java.util.stream.Collectors;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.world.entity.EntitySelector;
+ import net.minecraft.world.entity.PathfinderMob;
+@@ -75,26 +72,25 @@ public class TemptingSensor extends Sensor<PathfinderMob> {
+             }
+             targetPlayer = nearestPlayer;
+         } else {
+-            // Default case for non-optimized / non-vanilla tempt goal predicates. Sorting the entire list is completely useless, but none of the vanilla logic uses this path now so
+-            // less diff and easier for updates.
+-            // Paper end - optimise temptation lookups
+-        // Leaf start - Remove stream in TemptingSensor
+-        List<net.minecraft.server.level.ServerPlayer> allPlayers = level.players();
+-        List<Player> players = new java.util.ArrayList<>();
+-        for (Player p : allPlayers) {
+-            if (EntitySelector.NO_SPECTATORS.test(p)
+-                    && targeting.test(level, body, p)
+-                    && this.playerHoldingTemptation(body, p)
+-                    && !body.hasPassenger(p)) {
+-                players.add(p);
++            // Default case for non-optimized / non-vanilla tempt goal predicates.
++            double nearestDistance = -1.0;
++            Player nearestPlayer = null;
++            final double entityX = body.getX();
++            final double entityY = body.getY();
++            final double entityZ = body.getZ();
++            for (Player player : level.players()) {
++                if (EntitySelector.NO_SPECTATORS.test(player)
++                    && targeting.test(level, body, player)
++                    && this.playerHoldingTemptation(body, player)
++                    && !body.hasPassenger(player)) {
++                    double distance = player.distanceToSqr(entityX, entityY, entityZ);
++                    if (nearestDistance == -1.0 || distance < nearestDistance) {
++                        nearestDistance = distance;
++                        nearestPlayer = player;
++                    }
++                }
+             }
+-        }
+-        // Leaf end - Remove stream in TemptingSensor
+-        if (!players.isEmpty()) {
+-            players.sort(Comparator.comparingDouble(body::distanceToSqr)); // Leaf - Remove stream in TemptingSensor
+-            // Paper start - optimise temptation lookups
+-        }
+-            targetPlayer = players.isEmpty() ? null : players.getFirst();
++            targetPlayer = nearestPlayer;
+         }
+         if (targetPlayer != null) {
+             Player player = targetPlayer;
