@@ -1,0 +1,49 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 07:00:00 +0800
+Subject: [PATCH] Cache long-jump candidate total weight
+
+Compute the total candidate weight once when a long-jump behavior starts and
+decrement it as candidates are removed. This removes one complete list pass
+per weighted choice while preserving list order, probability, and the single
+RNG draw used by vanilla WeightedRandom.
+
+Source inspiration: Lithium 26.1.x long_jump_weighted_choice, 2No2Name,
+revision 701fb2e7636c6d634c76380c11232d27fd578dff.
+License: LGPL-3.0-only; independently adapted without its packed-list cache.
+
+diff --git a/net/minecraft/world/entity/ai/behavior/LongJumpToRandomPos.java b/net/minecraft/world/entity/ai/behavior/LongJumpToRandomPos.java
+index fe74037..8324d5c 100644
+--- a/net/minecraft/world/entity/ai/behavior/LongJumpToRandomPos.java
++++ b/net/minecraft/world/entity/ai/behavior/LongJumpToRandomPos.java
+@@ -38,6 +38,7 @@ public class LongJumpToRandomPos<E extends Mob> extends Behavior<E> {
+     protected final int maxLongJumpWidth;
+     protected final float maxJumpVelocityMultiplier;
+     protected List<LongJumpToRandomPos.PossibleJump> jumpCandidates = Lists.newArrayList();
++    private int totalCandidateWeight;
+     protected Optional<Vec3> initialPosition = Optional.empty();
+     protected @Nullable Vec3 chosenJump;
+     protected int findJumpTries;
+@@ -140,6 +141,7 @@ public class LongJumpToRandomPos<E extends Mob> extends Behavior<E> {
+             .filter(pos -> !pos.equals(mobPos))
+             .map(pos -> new LongJumpToRandomPos.PossibleJump(pos.immutable(), Mth.ceil(mobPos.distSqr(pos))))
+             .collect(Collectors.toCollection(Lists::newArrayList));
++        this.totalCandidateWeight = WeightedRandom.getTotalWeight(this.jumpCandidates, LongJumpToRandomPos.PossibleJump::weight);
+     }
+ 
+     @Override
+@@ -186,9 +188,12 @@ public class LongJumpToRandomPos<E extends Mob> extends Behavior<E> {
+ 
+     protected Optional<LongJumpToRandomPos.PossibleJump> getJumpCandidate(final ServerLevel level) {
+         Optional<LongJumpToRandomPos.PossibleJump> randomItem = WeightedRandom.getRandomItem(
+-            level.getRandom(), this.jumpCandidates, LongJumpToRandomPos.PossibleJump::weight
++            level.getRandom(), this.jumpCandidates, this.totalCandidateWeight, LongJumpToRandomPos.PossibleJump::weight
+         );
+-        randomItem.ifPresent(this.jumpCandidates::remove);
++        randomItem.ifPresent(candidate -> {
++            this.totalCandidateWeight -= candidate.weight();
++            this.jumpCandidates.remove(candidate);
++        });
+         return randomItem;
+     }
+ 
