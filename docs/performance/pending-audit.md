@@ -105,3 +105,51 @@ No CMI, CMILib, LuckPerms, Vault, PlaceholderAPI, or ProtocolLib jars/configurat
 - Region truncation still lacks deliberate process-kill crash injection and a DSYNC/filesystem matrix; current source ordering and focused persistence tests support retention.
 
 Final retained experiment stack is intentionally smaller than the construction stack. Expensive complexity was removed where evidence did not justify it.
+
+## Round 3 — entity and AI cheap-win sweep
+
+Round 3 started from Leaf base `c88c018de8455d831501b18bfb5e442dc11846e3` and Fork commit `8efdd1eff651d8a18bcb02bf995b071d55599bf2`. Earlier synchronization, CI, README, benchmarks, and the 48-commit audit were treated as verified inputs and were not repeated.
+
+### Retained
+
+| Commit | Change | Classification and scope |
+|---|---|---|
+| `13de8c37` | Skip empty block-effect collector flushes | **RETAIN — CHEAP WIN.** Avoids effect-type scans when no block or fluid recorded an effect; block callbacks and `EntityInsideBlockEvent` remain unchanged. Inspired by Lithium 26.1.x `entity.collisions.block_effects`, revision `701fb2e7`, LGPL-3.0-only. |
+| `a33fcd10` | Count player passengers without recursive Streams | **RETAIN — CHEAP WIN.** Direct recursion preserves the exact count and removes Stream pipelines. Inspired by Lithium `alloc.deep_passengers`, revision `701fb2e7`, LGPL-3.0-only. |
+| `e0897dc9` | Direct Breeze/Warden attack-sensor iteration | **RETAIN — CHEAP WIN.** Preserves Breeze encounter order and Warden player-first two-pass targeting. |
+| `a673c57f` | Allocation-free `TemptingSensor` fallback | **RETAIN — CHEAP WIN.** Preserves filter order, stable equal-distance choice, the optimized global lookup, and Bukkit target-event behavior. Inspired by Lithium `ai.sensor.replace_streams.tempting`, revision `701fb2e7`, LGPL-3.0-only. |
+| `7debaf93` | Cache long-jump candidate total weight | **RETAIN — CHEAP WIN.** Removes one complete weight-sum pass per choice while keeping list order, probability, and the single RNG draw. Inspired by Lithium `long_jump_weighted_choice`, revision `701fb2e7`, LGPL-3.0-only; the larger packed-list cache was not ported. |
+
+### Reviewer reverts
+
+- `ee83e8f3` goat item-sensor removal was reverted by `ea3ef647`: removing the sensor also changed Brain construction RNG consumption, later sensor offsets, memory registration, and debug-visible structure. A parity-preserving disable mechanism was not cheap enough for this round.
+- `8962fd6a` framed-map holder narrowing was reverted by `252725b8`: the narrowed loop skipped other-holder map-invisibility cleanup and could change decorations sent to a frame viewer.
+
+### Skipped — already covered
+
+- `fast_hand_swing`: existing Leaf/Lithium early return in `LivingEntity#updateSwingTime`.
+- `fast_powder_snow_check`: existing frozen-tick-before-block lookup; broader skipping would lose powder-snow flags, events, stuck motion, or extinguish behavior.
+- Server sprint particles: existing Leaf configuration guard; particles and RNG are packet-visible when enabled.
+- Hot-path `Enum.values()`: existing Leaf Paw/direction caches already cover the relevant piston, redstone, collision, and tick loops.
+- Secondary POI: existing Gale/Lithium empty-secondary-POI early return retains memory cleanup.
+- AI memory-change and task launch tracking: existing Lithium memory modification counter plus Leaf active/running behavior arrays already cover the requested work.
+- `MapItemSavedData` disconnect cleanup: `ServerLevel.EntityCallbacks#onTrackingEnd` removes player and holder references across loaded maps.
+
+### Deferred or rejected
+
+- Baby-specific sensor disabling needs reliable adult↔baby re-enable and stale-memory handling.
+- End-portal pattern rejection is cold and no cheaper necessary-condition check was established.
+- Projectile-projectile query reduction requires entity-section class-group filtering and event/order proof; it is not a local predicate change.
+- Concrete `Entity#isInWall` sync-load removal would change unknown-chunk suffocation semantics; other audited movement, fluid, collision, and pathfinding callers already use no-load paths.
+- `Entity#isAlive` caching was rejected because the existing checks are cheaper than a new invalidation model.
+- ItemEntity categorized merging remains a large retained-index/event-order project and must preserve `ItemMergeEvent` behavior.
+- Async advancement/stat saving needs immutable snapshots, ordered replacement, logout/shutdown joining, and crash-consistency handling. The removed upstream async chunk sender is not reintroduced.
+
+### Focused validation and review
+
+- `applyAllPatches` and `leaf-server:compileJava` passed for the seven construction patches before review.
+- 500 randomized parity cases passed for stable nearest-player selection, player-first target selection, and cached weighted-choice totals. The first harness version used a non-stable PowerShell sort, detected a false mismatch, and was corrected to model Java's stable sort explicitly.
+- Final Paperclip build passed; SHA-256 `270C1920B8A4BF2048E44C6FC4B24963681A66913BFA1B7405A0E1459776BA77`.
+- A final zero-plugin datapack smoke on commit `252725b8` loaded powder-snow goats, a ground goat, a Breeze, and a Warden, logged `ROUND3_TARGETED_SMOKE_LOADED`, reached `Done (10.149s)`, and ran without `ERROR`/`FATAL`. Two earlier smoke-input attempts were discarded after detecting obsolete command/entity identifiers before the function could load.
+- The independent reviewer retained five commits and required the goat and framed-map reverts above. A fresh narrow follow-up confirmed both regressions were exactly removed, the five retained patches remained intact, and returned **PASS** with no blocker/high findings.
+- Final post-review `applyAllPatches` and `leaf-server:compileJava` passed.
