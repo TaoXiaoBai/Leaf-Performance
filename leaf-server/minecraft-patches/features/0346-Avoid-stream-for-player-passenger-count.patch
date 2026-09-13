@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 07:00:00 +0800
+Subject: [PATCH] Avoid streams when counting player passengers
+
+Count players in the riding tree directly instead of constructing recursive
+Stream pipelines. Traversal and the returned count remain identical.
+
+Source inspiration: Lithium 26.1.x alloc.deep_passengers, 2No2Name,
+revision 701fb2e7636c6d634c76380c11232d27fd578dff.
+License: LGPL-3.0-only; independently adapted to current Leaf 26.2.
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 4182527..f1e7083 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -4967,7 +4967,14 @@ public abstract class Entity
+     }
+ 
+     public int countPlayerPassengers() {
+-        return (int)this.getIndirectPassengersStream().filter(e -> e instanceof Player).count();
++        int count = 0;
++        for (Entity passenger : this.passengers) {
++            if (passenger instanceof Player) {
++                count++;
++            }
++            count += passenger.countPlayerPassengers();
++        }
++        return count;
+     }
+ 
+     public boolean hasExactlyOnePlayerPassenger() {
