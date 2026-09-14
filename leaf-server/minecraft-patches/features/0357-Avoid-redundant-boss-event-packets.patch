@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 08:06:41 +0800
+Subject: [PATCH] Avoid redundant boss-event packets
+
+Do not invoke packet factories for visible boss events with no recipients, and construct one add/remove packet per visibility transition instead of one per player.
+
+diff --git a/net/minecraft/server/level/ServerBossEvent.java b/net/minecraft/server/level/ServerBossEvent.java
+index f1c8e45fdc4d7c70c4c5c6d4d6533364b74dba97..47ba216de3de0622a2a3541da25d23cd695dec50 100644
+--- a/net/minecraft/server/level/ServerBossEvent.java
++++ b/net/minecraft/server/level/ServerBossEvent.java
+@@ -91,7 +91,7 @@ public class ServerBossEvent extends BossEvent {
+     }
+ 
+     public void broadcast(final Function<BossEvent, ClientboundBossEventPacket> factory) {
+-        if (this.visible) {
++        if (this.visible && !this.players.isEmpty()) {
+             ClientboundBossEventPacket packet = factory.apply(this);
+ 
+             for (ServerPlayer player : this.players) {
+@@ -129,9 +129,13 @@ public class ServerBossEvent extends BossEvent {
+             this.visible = visible;
+             this.setDirty();
+ 
+-            for (ServerPlayer player : this.players) {
+-                player.connection
+-                    .send(visible ? ClientboundBossEventPacket.createAddPacket(this) : ClientboundBossEventPacket.createRemovePacket(this.getId()));
++            if (!this.players.isEmpty()) {
++                ClientboundBossEventPacket packet = visible
++                    ? ClientboundBossEventPacket.createAddPacket(this)
++                    : ClientboundBossEventPacket.createRemovePacket(this.getId());
++                for (ServerPlayer player : this.players) {
++                    player.connection.send(packet);
++                }
+             }
+         }
+     }
