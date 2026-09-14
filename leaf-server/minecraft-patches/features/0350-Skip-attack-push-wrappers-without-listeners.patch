@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 08:01:55 +0800
+Subject: [PATCH] Skip attack-push wrappers without listeners
+
+Apply the raw push vector directly when no EntityKnockbackEvent listeners are registered. This avoids Bukkit entity wrappers, the event object, and up to two Bukkit Vector allocations while preserving the complete listener-present cancellation and mutation path.
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index f1e708371385c231048af33a8e3cae02ef648522..9c3af8297a5a0a3cd42d417a0cf72babde00620d 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -2605,15 +2605,16 @@ public abstract class Entity
+         // Paper end - Add EntityKnockbackByEntityEvent and EntityPushedByEntityAttackEvent
+         if (Double.isFinite(xa) && Double.isFinite(ya) && Double.isFinite(za)) {
+             // Paper start - Add EntityKnockbackByEntityEvent and EntityPushedByEntityAttackEvent
+-            org.bukkit.util.Vector delta = new org.bukkit.util.Vector(xa, ya, za);
+-            if (pushingEntity != null) {
+-                io.papermc.paper.event.entity.EntityPushedByEntityAttackEvent event = new io.papermc.paper.event.entity.EntityPushedByEntityAttackEvent(this.getBukkitEntity(), io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.PUSH, pushingEntity.getBukkitEntity(), delta);
++            if (pushingEntity != null && io.papermc.paper.event.entity.EntityKnockbackEvent.getHandlerList().getRegisteredListeners().length != 0) {
++                io.papermc.paper.event.entity.EntityPushedByEntityAttackEvent event = new io.papermc.paper.event.entity.EntityPushedByEntityAttackEvent(this.getBukkitEntity(), io.papermc.paper.event.entity.EntityKnockbackEvent.Cause.PUSH, pushingEntity.getBukkitEntity(), new org.bukkit.util.Vector(xa, ya, za));
+                 if (!event.callEvent()) {
+                     return;
+                 }
+-                delta = event.getKnockback();
++                org.bukkit.util.Vector delta = event.getKnockback();
++                this.setDeltaMovement(this.getDeltaMovement().add(delta.getX(), delta.getY(), delta.getZ()));
++            } else {
++                this.setDeltaMovement(this.getDeltaMovement().add(xa, ya, za));
+             }
+-            this.setDeltaMovement(this.getDeltaMovement().add(delta.getX(), delta.getY(), delta.getZ()));
+             // Paper end - Add EntityKnockbackByEntityEvent and EntityPushedByEntityAttackEvent
+             this.needsSync = true;
+         }
