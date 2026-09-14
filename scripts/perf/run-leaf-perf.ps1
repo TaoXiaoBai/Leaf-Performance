@@ -12,7 +12,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-if (-not $JarPath) { $JarPath = Join-Path $repo 'leaf-server\build\libs\leaf-paperclip-26.2.local-SNAPSHOT.jar' }
+if (-not $JarPath) {
+    $builds = Get-ChildItem (Join-Path $repo 'leaf-server\build\libs') -Filter 'leaf-paperclip-26.2.build.*-alpha.jar' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTimeUtc -Descending
+    if (-not $builds) {
+        throw 'No numeric BUILD_NUMBER Paperclip found. Run scripts\build-local-compatible.ps1 first or pass -JarPath explicitly.'
+    }
+    $JarPath = $builds[0].FullName
+}
 $JarPath = (Resolve-Path $JarPath).Path
 $template = Join-Path $repo "run\perf\templates\$Scenario"
 $runDir = Join-Path $repo "run\perf\runs\$RunId"

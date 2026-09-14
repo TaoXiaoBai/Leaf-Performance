@@ -26,6 +26,8 @@ jobs:
     timeout-minutes: 60
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      # Keep Bukkit's exposed API version on Leaf/Paper's numeric build format.
+      BUILD_NUMBER: ${{ github.run_number }}
 
     steps:
       - name: Validate release tag
