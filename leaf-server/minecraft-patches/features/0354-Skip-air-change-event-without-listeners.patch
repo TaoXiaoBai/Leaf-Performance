@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 08:05:19 +0800
+Subject: [PATCH] Skip air-change event without listeners
+
+Set the synchronized air value directly during world generation or when EntityAirChangeEvent has no listeners. The dynamic listener-present cancellation, resync, and amount-mutation path remains unchanged.
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index 9c3af8297a5a0a3cd42d417a0cf72babde00620d..e7765cecf6b3cf4a28ccfaf0cddaafa3739bd1c6 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -4019,11 +4019,13 @@ public abstract class Entity
+ 
+     public void setAirSupply(final int supply) {
+         // CraftBukkit start
+-        org.bukkit.event.entity.EntityAirChangeEvent event = new org.bukkit.event.entity.EntityAirChangeEvent(this.getBukkitEntity(), supply);
+-        // Suppress during worldgen
+-        if (this.valid) {
+-            event.getEntity().getServer().getPluginManager().callEvent(event);
++        if (!this.valid || org.bukkit.event.entity.EntityAirChangeEvent.getHandlerList().getRegisteredListeners().length == 0) {
++            this.entityData.set(DATA_AIR_SUPPLY_ID, supply);
++            return;
+         }
++
++        org.bukkit.event.entity.EntityAirChangeEvent event = new org.bukkit.event.entity.EntityAirChangeEvent(this.getBukkitEntity(), supply);
++        event.getEntity().getServer().getPluginManager().callEvent(event);
+         if (event.isCancelled() && this.getAirSupply() != supply) {
+             if (this instanceof ServerPlayer player) {
+                 this.resendPossiblyDesyncedDataValues(java.util.List.of(DATA_AIR_SUPPLY_ID), player); // todo is that even needed?
