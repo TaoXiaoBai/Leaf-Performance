@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 08:02:24 +0800
+Subject: [PATCH] Skip ItemCraftedEvent without listeners
+
+Avoid creating Bukkit player/item wrappers and ItemCraftedEvent objects for result-slot takes when no listeners are registered. Listener checks remain dynamic and the listener-present dispatch path is unchanged.
+
+diff --git a/net/minecraft/world/inventory/ResultSlot.java b/net/minecraft/world/inventory/ResultSlot.java
+index 0b082799e1310660bf9488e0613b85748dde4a31..a8eb7a1390b5583b75c6a137f4a6ffe08a896e6a 100644
+--- a/net/minecraft/world/inventory/ResultSlot.java
++++ b/net/minecraft/world/inventory/ResultSlot.java
+@@ -40,7 +40,7 @@ public class ResultSlot extends Slot {
+         this.removeCount += count;
+         this.checkTakeAchievements(picked);
+         // Paper start - add ItemCraftedEvent
+-        if (!picked.isEmpty()) {
++        if (!picked.isEmpty() && io.papermc.paper.event.inventory.ItemCraftedEvent.getHandlerList().getRegisteredListeners().length != 0) {
+             new io.papermc.paper.event.inventory.ItemCraftedEvent((org.bukkit.entity.Player) this.player.getBukkitEntity(), org.bukkit.craftbukkit.inventory.CraftItemStack.asBukkitCopy(picked)).callEvent();
+         }
+         // Paper end - add ItemCraftedEvent
+@@ -93,7 +93,7 @@ public class ResultSlot extends Slot {
+     @Override
+     public void onTake(final Player player, final ItemStack carried) {
+         // Paper start - add ItemCraftedEvent
+-        if (!carried.isEmpty()) {
++        if (!carried.isEmpty() && io.papermc.paper.event.inventory.ItemCraftedEvent.getHandlerList().getRegisteredListeners().length != 0) {
+             new io.papermc.paper.event.inventory.ItemCraftedEvent((org.bukkit.entity.Player) player.getBukkitEntity(), org.bukkit.craftbukkit.inventory.CraftItemStack.asBukkitCopy(carried)).callEvent();
+         }
+         // Paper end - add ItemCraftedEvent
