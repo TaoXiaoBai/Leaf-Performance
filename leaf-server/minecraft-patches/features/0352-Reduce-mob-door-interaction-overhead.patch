@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 08:03:13 +0800
+Subject: [PATCH] Reduce mob door interaction overhead
+
+Skip EntityInteractEvent wrapper construction when its HandlerList is empty and replace the per-door nearest-entity Stream with an encounter-order loop. Listener-present cancellation and path checks retain their original order.
+
+diff --git a/net/minecraft/world/entity/ai/behavior/InteractWithDoor.java b/net/minecraft/world/entity/ai/behavior/InteractWithDoor.java
+index 3d7026568c6ab3ae090f0f3fc4bc03fe8c883470..e9e4bb1c8bb46375a2be4d6e484f83c550128c61 100644
+--- a/net/minecraft/world/entity/ai/behavior/InteractWithDoor.java
++++ b/net/minecraft/world/entity/ai/behavior/InteractWithDoor.java
+@@ -57,9 +57,11 @@ public class InteractWithDoor {
+                                 DoorBlock fromBlock = (DoorBlock)fromState.getBlock();
+                                 if (!fromBlock.isOpen(fromState)) {
+                                     // CraftBukkit start - entities opening doors
+-                                    org.bukkit.event.entity.EntityInteractEvent event = new org.bukkit.event.entity.EntityInteractEvent(body.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(body.level(), fromPos));
+-                                    if (!event.callEvent()) {
+-                                        return false;
++                                    if (org.bukkit.event.entity.EntityInteractEvent.getHandlerList().getRegisteredListeners().length != 0) {
++                                        org.bukkit.event.entity.EntityInteractEvent event = new org.bukkit.event.entity.EntityInteractEvent(body.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(body.level(), fromPos));
++                                        if (!event.callEvent()) {
++                                            return false;
++                                        }
+                                     }
+                                     // CraftBukkit end - entities opening doors
+                                     fromBlock.setOpen(body, level, fromState, fromPos, true);
+@@ -74,9 +76,11 @@ public class InteractWithDoor {
+                                 DoorBlock door = (DoorBlock)toState.getBlock();
+                                 if (!door.isOpen(toState)) {
+                                     // CraftBukkit start - entities opening doors
+-                                    org.bukkit.event.entity.EntityInteractEvent event = new org.bukkit.event.entity.EntityInteractEvent(body.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(body.level(), toPos));
+-                                    if (!event.callEvent()) {
+-                                        return false;
++                                    if (org.bukkit.event.entity.EntityInteractEvent.getHandlerList().getRegisteredListeners().length != 0) {
++                                        org.bukkit.event.entity.EntityInteractEvent event = new org.bukkit.event.entity.EntityInteractEvent(body.getBukkitEntity(), org.bukkit.craftbukkit.block.CraftBlock.at(body.level(), toPos));
++                                        if (!event.callEvent()) {
++                                            return false;
++                                        }
+                                     }
+                                     // CraftBukkit end - entities opening doors
+                                     door.setOpen(body, level, toState, toPos, true);
+@@ -136,12 +140,19 @@ public class InteractWithDoor {
+     }
+ 
+     private static boolean areOtherMobsComingThroughDoor(final LivingEntity body, final BlockPos doorPos, final Optional<List<LivingEntity>> nearestEntities) {
+-        return !nearestEntities.isEmpty()
+-            && nearestEntities.get()
+-                .stream()
+-                .filter(otherMob -> otherMob.getType() == body.getType())
+-                .filter(otherMob -> doorPos.closerToCenterThan(otherMob.position(), MAX_DISTANCE_TO_HOLD_DOOR_OPEN_FOR_OTHER_MOBS))
+-                .anyMatch(otherMob -> isMobComingThroughDoor(otherMob.getBrain(), doorPos));
++        if (nearestEntities.isEmpty()) {
++            return false;
++        }
++
++        for (LivingEntity otherMob : nearestEntities.get()) {
++            if (otherMob.getType() == body.getType()
++                && doorPos.closerToCenterThan(otherMob.position(), MAX_DISTANCE_TO_HOLD_DOOR_OPEN_FOR_OTHER_MOBS)
++                && isMobComingThroughDoor(otherMob.getBrain(), doorPos)) {
++                return true;
++            }
++        }
++
++        return false;
+     }
+ 
+     private static boolean isMobComingThroughDoor(final Brain<?> otherBrain, final BlockPos doorPos) {
