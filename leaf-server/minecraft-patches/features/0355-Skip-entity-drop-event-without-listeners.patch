@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 08:05:38 +0800
+Subject: [PATCH] Skip entity-drop event without listeners
+
+Add entity drops directly when EntityDropItemEvent has no registered listeners, avoiding source/item Bukkit wrappers and the event object while preserving the complete cancellable listener path.
+
+diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
+index e7765cecf6b3cf4a28ccfaf0cddaafa3739bd1c6..1535f0389248fc502c552f011157f56f843c66f2 100644
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -3154,10 +3154,12 @@ public abstract class Entity
+     public @Nullable ItemEntity spawnAtLocation(final ServerLevel level, final ItemEntity entity) {
+         // Paper end - Call EntityDropItemEvent
+         // CraftBukkit start
+-        org.bukkit.event.entity.EntityDropItemEvent event = new org.bukkit.event.entity.EntityDropItemEvent(this.getBukkitEntity(), (org.bukkit.entity.Item) entity.getBukkitEntity());
+-        org.bukkit.Bukkit.getPluginManager().callEvent(event);
+-        if (event.isCancelled()) {
+-            return null;
++        if (org.bukkit.event.entity.EntityDropItemEvent.getHandlerList().getRegisteredListeners().length != 0) {
++            org.bukkit.event.entity.EntityDropItemEvent event = new org.bukkit.event.entity.EntityDropItemEvent(this.getBukkitEntity(), (org.bukkit.entity.Item) entity.getBukkitEntity());
++            org.bukkit.Bukkit.getPluginManager().callEvent(event);
++            if (event.isCancelled()) {
++                return null;
++            }
+         }
+         // CraftBukkit end
+         level.addFreshEntity(entity);
