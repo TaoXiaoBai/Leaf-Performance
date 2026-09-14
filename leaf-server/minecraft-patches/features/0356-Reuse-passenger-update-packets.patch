@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Leaf Performance experiments <noreply@localhost>
+Date: Mon, 14 Sep 2026 08:06:12 +0800
+Subject: [PATCH] Reuse passenger update packets
+
+Construct one immutable passenger packet per changed passenger snapshot and reuse it for tracking recipients and the tracked player itself. Apply the same change to synchronous and multithreaded tracker paths.
+
+diff --git a/net/minecraft/server/level/ServerEntity.java b/net/minecraft/server/level/ServerEntity.java
+index fdb9d357d3d5529341203cdd3f3185bedb5ce3e8..9ed2e6a113cac6142a57d72b192f39136193db18 100644
+--- a/net/minecraft/server/level/ServerEntity.java
++++ b/net/minecraft/server/level/ServerEntity.java
+@@ -106,13 +106,14 @@ public class ServerEntity {
+         this.entity.updateDataBeforeSync(); // Leaf - Multithreaded tracker - diff on change
+         List<Entity> passengers = this.entity.getPassengers(); // Leaf - Multithreaded tracker - diff on change
+         if (!passengers.equals(this.lastPassengers)) {
++            ClientboundSetPassengersPacket packet = new ClientboundSetPassengersPacket(this.entity);
+             this.synchronizer
+                 .sendToTrackingPlayersFiltered( // Leaf - Multithreaded tracker - diff on change
+-                    new ClientboundSetPassengersPacket(this.entity), player -> passengers.contains(player) == this.lastPassengers.contains(player)
++                    packet, player -> passengers.contains(player) == this.lastPassengers.contains(player)
+                 );
+             // Paper start - Allow riding players // Leaf - Multithreaded tracker - diff on change
+             if (this.entity instanceof ServerPlayer player) {
+-                player.connection.send(new ClientboundSetPassengersPacket(this.entity));
++                player.connection.send(packet);
+             }
+             // Paper end - Allow riding players
+             this.lastPassengers = passengers; // Leaf - Multithreaded tracker - diff on change
+@@ -470,14 +471,15 @@ public class ServerEntity {
+         //this.entity.updateDataBeforeSync(); // Move to AsyncTracker#handlePlayer
+         List<Entity> passengers = this.entity.getPassengers();
+         if (!passengers.equals(this.lastPassengers)) {
++            ClientboundSetPassengersPacket packet = new ClientboundSetPassengersPacket(this.entity);
+             ctx.sendToTrackingPlayersFiltered(
+                 tracker,
+-                new ClientboundSetPassengersPacket(this.entity),
++                packet,
+                 player -> passengers.contains(player) == this.lastPassengers.contains(player)
+                 );
+             // Paper start - Allow riding players
+             if (this.entity instanceof ServerPlayer player) {
+-                ctx.send(player.connection, new ClientboundSetPassengersPacket(this.entity));
++                ctx.send(player.connection, packet);
+             }
+             // Paper end - Allow riding players
+             this.lastPassengers = passengers;
