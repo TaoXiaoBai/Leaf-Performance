@@ -121,7 +121,7 @@ index aa5bebc293a73468cadf7939fd0a64822953e452..eb5d5b31329a5c6420556966e7fd1ac1
                  // Paper end
                  // CraftBukkit start
 diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
-index 53dfd4a95746d57a214da982a76cd0e847d27d60..ad5eaa73a0b491c0e482a20cccbe78806fa326d8 100644
+index e0cdec9d3d4c83af8ac8140aade643173c0dd13d..122cd865ed4decd9bf265a846e4434274e358860 100644
 --- a/net/minecraft/server/MinecraftServer.java
 +++ b/net/minecraft/server/MinecraftServer.java
 @@ -340,6 +340,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
@@ -786,10 +786,10 @@ index b9748a392c9f76e61a1b673085b4dd74c007c70d..6774051521794990278d5ef5cf6b3dab
          for (ServerPlayer player : this.players) {
              this.createConnection(player, waypoint);
 diff --git a/net/minecraft/world/entity/Entity.java b/net/minecraft/world/entity/Entity.java
-index 7de74d6ec476fe35fd4c7e32a8786f4bceab1411..cabd65d9d315ce9105f9faa5e62a7d5ce0c3f6ff 100644
+index 03ff1aa7d14d69ca562d5d59653744bc9e8c876f..294432585a9a1085992dcc097843430cdb1a5147 100644
 --- a/net/minecraft/world/entity/Entity.java
 +++ b/net/minecraft/world/entity/Entity.java
-@@ -3673,13 +3673,7 @@ public abstract class Entity
+@@ -3676,13 +3676,7 @@ public abstract class Entity
                      ProfilerFiller profiler = Profiler.get();
                      profiler.push("portal");
                      this.setPortalCooldown();
@@ -804,7 +804,7 @@ index 7de74d6ec476fe35fd4c7e32a8786f4bceab1411..cabd65d9d315ce9105f9faa5e62a7d5c
  
                      profiler.pop();
                  } else if (this.portalProcess.hasExpired()) {
-@@ -3689,6 +3683,55 @@ public abstract class Entity
+@@ -3692,6 +3686,55 @@ public abstract class Entity
          }
      }
  
@@ -860,7 +860,7 @@ index 7de74d6ec476fe35fd4c7e32a8786f4bceab1411..cabd65d9d315ce9105f9faa5e62a7d5c
      public int getDimensionChangingDelay() {
          Entity firstPassenger = this.getFirstPassenger();
          return firstPassenger instanceof ServerPlayer ? firstPassenger.getDimensionChangingDelay() : 300;
-@@ -4264,6 +4307,7 @@ public abstract class Entity
+@@ -4267,6 +4310,7 @@ public abstract class Entity
      }
  
      private @Nullable Entity teleportCrossDimension(final ServerLevel oldLevel, final ServerLevel newLevel, final TeleportTransition transition) {
@@ -985,10 +985,10 @@ index ba61762e09ace201173999b3984046f930ccfe57..2ec5283bdab7f533edeab8812a9033f0
          body.getBrain().eraseMemory(MemoryModuleType.POTENTIAL_JOB_SITE);
      }
 diff --git a/net/minecraft/world/entity/npc/villager/Villager.java b/net/minecraft/world/entity/npc/villager/Villager.java
-index d74dde6c73ee7929e502fd4f3941e8b90f4616a1..99b6a321b5c0b9c4e8702230612beec9ed700249 100644
+index 49e9aca289dfe439e8c4925fdc3ca21b22deae8d..d238aaa3abf7f4ff2fdb6eccc5e0a7ac2282bb36 100644
 --- a/net/minecraft/world/entity/npc/villager/Villager.java
 +++ b/net/minecraft/world/entity/npc/villager/Villager.java
-@@ -796,13 +796,29 @@ public class Villager extends AbstractVillager implements VillagerDataHolder, Re
+@@ -813,13 +813,29 @@ public class Villager extends AbstractVillager implements VillagerDataHolder, Re
              this.brain.getMemory(memoryType).ifPresent(memory -> {
                  ServerLevel poiLevel = server.getLevel(memory.dimension());
                  if (poiLevel != null) {
