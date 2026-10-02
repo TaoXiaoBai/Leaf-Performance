@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Tao Xiaobai <1599170798@qq.com>
+Date: Fri, 2 Oct 2026 16:51:45 +0800
+Subject: [PATCH] Avoid duplicate ListBackedContainer slot lookup
+
+Read the target slot once after the existing item-type check, preserving short-circuit order while avoiding a duplicate list access.
+
+This is an independent Leaf-Performance optimization.
+
+diff --git a/net/minecraft/world/level/block/entity/ListBackedContainer.java b/net/minecraft/world/level/block/entity/ListBackedContainer.java
+index 89a86543ccb6ca2c9a292a425c6b17e7cb646bce..4fcf98fb5980732194638d0a82aa243bb1aff020 100644
+--- a/net/minecraft/world/level/block/entity/ListBackedContainer.java
++++ b/net/minecraft/world/level/block/entity/ListBackedContainer.java
+@@ -50,7 +50,11 @@ public interface ListBackedContainer extends Container {
+ 
+     @Override
+     default boolean canPlaceItem(final int slot, final ItemStack itemStack) {
+-        return this.acceptsItemType(itemStack) && (this.getItem(slot).isEmpty() || this.getItem(slot).getCount() < this.getMaxStackSize(itemStack));
++        if (!this.acceptsItemType(itemStack)) {
++            return false;
++        }
++        final ItemStack current = this.getItem(slot);
++        return current.isEmpty() || current.getCount() < this.getMaxStackSize(itemStack);
+     }
+ 
+     default boolean acceptsItemType(final ItemStack itemStack) {
