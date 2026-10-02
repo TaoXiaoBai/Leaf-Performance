@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Tao Xiaobai <1599170798@qq.com>
+Date: Fri, 2 Oct 2026 16:51:48 +0800
+Subject: [PATCH] Skip impossible thunder ticks early
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Return before chunk-position and profiler work when thunder is disabled or impossible. Leaf's existing per-chunk shouldDoLightning countdown remains unchanged.
+
+Adapted from Gale PR #204 by Ömer (Nrleryxx), commit a17088ab. Gale patch/code license: GPL-3.0.
+
+diff --git a/net/minecraft/server/level/ServerLevel.java b/net/minecraft/server/level/ServerLevel.java
+index 8ab5d05bd88acfa21bc0237e3556b441c5425dea..b1de0d35d723d075074443c816b0d552fd76e648 100644
+--- a/net/minecraft/server/level/ServerLevel.java
++++ b/net/minecraft/server/level/ServerLevel.java
+@@ -1284,13 +1284,13 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
+     }
+ 
+     public void tickThunder(final LevelChunk chunk) {
++        if (this.paperConfig().environment.disableThunder || !this.isRaining() || !this.isThundering() || this.spigotConfig.thunderChance <= 0) return; // Gale - Nrleryxx - skip impossible thunder ticks
+         ChunkPos chunkPos = chunk.getPos();
+-        boolean raining = this.isRaining();
+         int minX = chunkPos.getMinBlockX();
+         int minZ = chunkPos.getMinBlockZ();
+         ProfilerFiller profiler = Profiler.get();
+         profiler.push("thunder");
+-        if (!this.paperConfig().environment.disableThunder && raining && this.isThundering() && this.spigotConfig.thunderChance > 0 /*&& this.random.nextInt(this.spigotConfig.thunderChance) == 0*/ && chunk.shouldDoLightning(this.random)) { // Spigot // Paper - Option to disable thunder // Gale - Airplane - optimize random calls in chunk ticking - replace random with shouldDoLightning
++        if (chunk.shouldDoLightning(this.random)) { // Spigot // Paper - Option to disable thunder // Gale - Airplane - optimize random calls in chunk ticking - replace random with shouldDoLightning
+             BlockPos pos = this.findLightningTargetAround(this.getBlockRandomPos(minX, 0, minZ, 15));
+             if (this.isRainingAt(pos)) {
+                 DifficultyInstance difficulty = this.getCurrentDifficultyAt(pos);
