@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Tao Xiaobai <1599170798@qq.com>
+Date: Fri, 2 Oct 2026 16:51:46 +0800
+Subject: [PATCH] Lazily create formatted objective names
+
+Defer the copied, styled hover component until command feedback actually requests it. Display-name changes invalidate the local derived value.
+
+Adapted from Paper PR #14039.
+
+diff --git a/net/minecraft/world/scores/Objective.java b/net/minecraft/world/scores/Objective.java
+index 64ea4741b7ed58fe7914b9431353abd1f658a935..a36a772ef30ba8f991781f760f6f10259b1b841e 100644
+--- a/net/minecraft/world/scores/Objective.java
++++ b/net/minecraft/world/scores/Objective.java
+@@ -18,7 +18,7 @@ public class Objective {
+     private final String name;
+     private final ObjectiveCriteria criteria;
+     private Component displayName;
+-    private Component formattedDisplayName;
++    private @Nullable Component formattedDisplayName;
+     private ObjectiveCriteria.RenderType renderType;
+     private boolean displayAutoUpdate;
+     private @Nullable NumberFormat numberFormat;
+@@ -36,7 +36,6 @@ public class Objective {
+         this.name = name;
+         this.criteria = criteria;
+         this.displayName = displayName;
+-        this.formattedDisplayName = this.createFormattedDisplayName();
+         this.renderType = renderType;
+         this.displayAutoUpdate = displayAutoUpdate;
+         this.numberFormat = numberFormat;
+@@ -81,12 +80,15 @@ public class Objective {
+     }
+ 
+     public Component getFormattedDisplayName() {
++        if (this.formattedDisplayName == null) {
++            this.formattedDisplayName = this.createFormattedDisplayName();
++        }
+         return this.formattedDisplayName;
+     }
+ 
+     public void setDisplayName(final Component name) {
+         this.displayName = name;
+-        this.formattedDisplayName = this.createFormattedDisplayName();
++        this.formattedDisplayName = null;
+         this.scoreboard.onObjectiveChanged(this);
+     }
+ 
