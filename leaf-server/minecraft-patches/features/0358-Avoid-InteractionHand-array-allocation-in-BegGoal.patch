@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Tao Xiaobai <1599170798@qq.com>
+Date: Fri, 2 Oct 2026 09:40:16 +0800
+Subject: [PATCH] Avoid InteractionHand array allocation in BegGoal
+
+Check the two interaction hands directly in their existing order instead of
+cloning the enum values array for every BegGoal item check.
+
+This is an independent Leaf-Performance optimization.
+
+
+diff --git a/net/minecraft/world/entity/ai/goal/BegGoal.java b/net/minecraft/world/entity/ai/goal/BegGoal.java
+index de09e4f4b1de208dd6e6f90e0271dc97dae75ab9..1c58ce04d527641c162844438b76ced109af8c3f 100644
+--- a/net/minecraft/world/entity/ai/goal/BegGoal.java
++++ b/net/minecraft/world/entity/ai/goal/BegGoal.java
+@@ -59,13 +59,12 @@ public class BegGoal extends Goal {
+     }
+ 
+     private boolean playerHoldingInteresting(final Player player) {
+-        for (InteractionHand hand : InteractionHand.values()) {
+-            ItemStack itemStack = player.getItemInHand(hand);
+-            if (itemStack.is(Items.BONE) || this.wolf.isFood(itemStack)) {
+-                return true;
+-            }
++        ItemStack itemStack = player.getItemInHand(InteractionHand.MAIN_HAND);
++        if (itemStack.is(Items.BONE) || this.wolf.isFood(itemStack)) {
++            return true;
+         }
+ 
+-        return false;
++        itemStack = player.getItemInHand(InteractionHand.OFF_HAND);
++        return itemStack.is(Items.BONE) || this.wolf.isFood(itemStack);
+     }
+ }
