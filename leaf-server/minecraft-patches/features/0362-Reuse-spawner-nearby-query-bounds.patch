@@ -1,33 +1,38 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Tao Xiaobai <1599170798@qq.com>
-Date: Fri, 2 Oct 2026 16:51:48 +0800
+Date: Fri, 2 Oct 2026 17:01:49 +0800
 Subject: [PATCH] Reuse spawner nearby-query bounds
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-Lazily create the immutable nearby-entity AABB only when the configured cap is queried, then reuse it for later attempts in the same spawner tick.
+Lazily create the immutable nearby-entity AABB only when the configured cap is queried, then reuse it while the live spawn range is unchanged.
 
 Adapted from Gale PR #204 by Ömer (Nrleryxx), commit a17088ab. Gale patch/code license: GPL-3.0.
+---
+ net/minecraft/world/level/BaseSpawner.java | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/net/minecraft/world/level/BaseSpawner.java b/net/minecraft/world/level/BaseSpawner.java
-index 92b0542572577f542cb258acf5e1184c07f6550b..71d1e53ca041527671e62781d25406ee39709305 100644
+index 92b0542..a9582ed 100644
 --- a/net/minecraft/world/level/BaseSpawner.java
 +++ b/net/minecraft/world/level/BaseSpawner.java
-@@ -136,6 +136,7 @@ public abstract class BaseSpawner {
+@@ -136,6 +136,8 @@ public abstract class BaseSpawner {
                  boolean delay = false;
                  RandomSource random = level.getRandom();
                  SpawnData nextSpawnData = this.getOrCreateNextSpawnData(level, random, pos);
 +                AABB nearbyEntitiesBox = null; // Gale - Nrleryxx - lazily reuse the nearby-spawn query box
++                int nearbyEntitiesRange = 0;
  
                  for (int c = 0; c < this.spawnCount; c++) {
                      try (ProblemReporter.ScopedCollector reporter = new ProblemReporter.ScopedCollector(this::toString, LOGGER)) {
-@@ -221,9 +222,12 @@ public abstract class BaseSpawner {
+@@ -221,9 +223,13 @@ public abstract class BaseSpawner {
                              }
  
                              if (!org.dreeam.leaf.config.modules.gameplay.SpawnerSettings.enabled || org.dreeam.leaf.config.modules.gameplay.SpawnerSettings.spawnerMaxNearbyCheck) { // Leaf - Spawner Configurations - Skip max nearby entity check if disabled
-+                            if (nearbyEntitiesBox == null) {
-+                                nearbyEntitiesBox = new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1).inflate(this.spawnRange); // Gale - Nrleryxx
++                            if (nearbyEntitiesBox == null || nearbyEntitiesRange != this.spawnRange) {
++                                nearbyEntitiesRange = this.spawnRange;
++                                nearbyEntitiesBox = new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1).inflate(nearbyEntitiesRange); // Gale - Nrleryxx
 +                            }
                              int nearBy = level.getEntities(
                                      EntityTypeTest.forExactClass(entity.getClass()),
@@ -36,3 +41,6 @@ index 92b0542572577f542cb258acf5e1184c07f6550b..71d1e53ca041527671e62781d25406ee
                                      EntitySelector.NO_SPECTATORS
                                  )
                                  .size();
+-- 
+2.56.0.windows.1
+
