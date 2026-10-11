@@ -100,10 +100,15 @@ jobs:
           checksum=$(sha256sum "$jar_name" | awk '{print $1}')
           printf '%s  %s\n' "$checksum" "$jar_name" > "${jar_name}.sha256"
 
+          release_kind="stable release"
+          if [[ "$RELEASE_TAG" =~ (test|alpha|beta|rc) ]]; then
+            release_kind="prerelease build"
+          fi
+
           cat > release-notes.md <<EOF
           # Leaf-Performance ${RELEASE_TAG}
 
-          This is an **unofficial Leaf-Performance experimental build**. It is not an official Leaf release and is not endorsed by Winds-Studio/Leaf.
+          This is a **Leaf-Performance ${release_kind}**, an independent fork of Leaf. It is not an official Leaf release and is not endorsed by Winds-Studio/Leaf.
 
           - Upstream Leaf base: \`${upstream_base}\`
           - Leaf-Performance fork commit: \`${fork_commit}\`
@@ -112,6 +117,20 @@ jobs:
 
           The Paperclip JAR was rebuilt from the tagged Leaf-Performance source by GitHub Actions using Zulu JDK 25.
           EOF
+
+          if [[ "$RELEASE_TAG" == "v26.2-lp.0" ]]; then
+            cat >> release-notes.md <<'EOF'
+
+          ## Changes since RC6
+
+          - Merge the latest Leaf 26.2 upstream, including nine Paper updates.
+          - Fix bundle contents with item obfuscation, custom max_damage Mending, weather after respawn, and villager display-item shearing.
+          - Add SulfurCube swallow API and cancellable player collision handling; correct panda/bee target reasons and copper golem container checks.
+          - Preserve the existing Leaf-Performance patch stack.
+
+          Known low-risk follow-up: cancelling villager zombification while trades are displayed may leave Leaf's AI running count stale, causing additional behavior scans. This interaction was identified by static review; runtime reproduction is pending.
+          EOF
+          fi
 
           echo "jar=$jar_name" >> "$GITHUB_OUTPUT"
           echo "checksum=${jar_name}.sha256" >> "$GITHUB_OUTPUT"
