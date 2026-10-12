@@ -127,6 +127,7 @@ jobs:
           - Fix bundle contents with item obfuscation, custom max_damage Mending, weather after respawn, and villager display-item shearing.
           - Add SulfurCube swallow API and cancellable player collision handling; correct panda/bee target reasons and copper golem container checks.
           - Preserve the existing Leaf-Performance patch stack.
+          - Fix the photographer API collection return contract found by annotation checks.
 
           Known low-risk follow-up: cancelling villager zombification while trades are displayed may leave Leaf's AI running count stale, causing additional behavior scans. This interaction was identified by static review; runtime reproduction is pending.
           EOF

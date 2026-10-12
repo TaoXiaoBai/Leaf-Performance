@@ -76,7 +76,7 @@ public class CraftPhotographerManager implements PhotographerManager {
     }
 
     @Override
-    public Collection<Photographer> getPhotographers() {
+    public @NotNull Collection<Photographer> getPhotographers() {
         return photographerViews;
     }
 }

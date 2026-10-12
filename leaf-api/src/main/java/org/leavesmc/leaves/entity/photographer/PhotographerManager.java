@@ -23,5 +23,5 @@ public interface PhotographerManager {
 
     void removeAllPhotographers();
 
-    Collection<Photographer> getPhotographers();
+    @NotNull Collection<Photographer> getPhotographers();
 }
