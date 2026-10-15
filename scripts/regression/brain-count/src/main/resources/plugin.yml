@@ -1,0 +1,6 @@
+name: BrainCountRegression
+version: 1.0.0-local
+main: local.leafperf.braincount.BrainCountPlugin
+api-version: '26.2'
+load: POSTWORLD
+description: Isolated real-NMS Brain counter and villager conversion regressions; auto-shuts down server
