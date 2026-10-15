@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Tao Xiaobai <1599170798@qq.com>
+Date: Thu, 15 Oct 2026 22:26:54 +0800
+Subject: [PATCH] Keep external behavior stops consistent with running counters
+
+---
+ net/minecraft/world/entity/ai/Brain.java      | 22 +++++++++++++++++++
+ .../world/entity/monster/zombie/Zombie.java   |  2 +-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/net/minecraft/world/entity/ai/Brain.java b/net/minecraft/world/entity/ai/Brain.java
+index d37c01f..13aabe4 100644
+--- a/net/minecraft/world/entity/ai/Brain.java
++++ b/net/minecraft/world/entity/ai/Brain.java
+@@ -441,6 +441,28 @@ public class Brain<E extends LivingEntity> implements net.caffeinemc.mods.lithiu
+     }
+     // Leaf end - Lithium - Reduce Brain memories lookup
+ 
++    // Leaf start - Keep external behavior stops consistent with running counters
++    public void stopBehavior(final ServerLevel level, final E body, final BehaviorControl<? super E> behavior, final long timestamp) {
++        behavior.doStop(level, body, timestamp);
++        // A behavior can belong to several groups, but only its starting group was incremented.
++        // Refresh matching current groups only; do not add a recount to the regular tick path.
++        for (Map<Activity, Set<BehaviorControl<? super E>>> byActivity : this.availableBehaviorsByPriority.values()) {
++            var behaviorsByActivity = (org.dreeam.leaf.util.map.ActivityArrayMap<Set<BehaviorControl<? super E>>>) byActivity;
++            final var behaviorSets = behaviorsByActivity.v;
++            for (int i = 0, size = behaviorsByActivity.size(); i < size; i++) {
++                var behaviorSet = (org.dreeam.leaf.util.map.BehaviorControlArraySet<? super E>) behaviorSets[i];
++                final var behaviors = behaviorSet.raw();
++                for (int index = 0, count = behaviorSet.size(); index < count; index++) {
++                    if (behaviors[index] == behavior) {
++                        behaviorSet.refreshRunningCount();
++                        break;
++                    }
++                }
++            }
++        }
++    }
++    // Leaf end - Keep external behavior stops consistent with running counters
++
+     public void stopAll(final ServerLevel level, final E body) {
+         long timestamp = body.level().getGameTime();
+ 
+diff --git a/net/minecraft/world/entity/monster/zombie/Zombie.java b/net/minecraft/world/entity/monster/zombie/Zombie.java
+index 757942c..24ca830 100644
+--- a/net/minecraft/world/entity/monster/zombie/Zombie.java
++++ b/net/minecraft/world/entity/monster/zombie/Zombie.java
+@@ -363,7 +363,7 @@ public class Zombie extends Monster {
+         // Paper start - Clear display items before conversion
+         for (net.minecraft.world.entity.ai.behavior.BehaviorControl<? super Villager> behavior : villager.getBrain().getRunningBehaviors()) {
+             if (behavior instanceof net.minecraft.world.entity.ai.behavior.ShowTradesToPlayer) {
+-                behavior.doStop(level, villager, level.getGameTime());
++                villager.getBrain().stopBehavior(level, villager, behavior, level.getGameTime()); // Leaf - Keep external behavior stops consistent with running counters
+             }
+         }
+         // Paper end - Clear display items before conversion

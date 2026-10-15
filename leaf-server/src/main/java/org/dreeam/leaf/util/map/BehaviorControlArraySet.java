@@ -36,6 +36,17 @@ public final class BehaviorControlArraySet<E extends LivingEntity> extends Abstr
         return running != 0;
     }
 
+    // Used only after an external stop, not on the regular Brain tick path.
+    public void refreshRunningCount() {
+        int running = 0;
+        for (int i = 0; i < this.size; i++) {
+            if (this.a[i].getStatus() == net.minecraft.world.entity.ai.behavior.Behavior.Status.RUNNING) {
+                running++;
+            }
+        }
+        this.running = running;
+    }
+
     @Override
     public int size() {
         return size;
