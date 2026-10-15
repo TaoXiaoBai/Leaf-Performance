@@ -2,7 +2,21 @@
 
 ## Project overview
 
-Leaf is a high-performance Paper fork.
+Leaf-Performance is an independent performance experiment fork of Leaf, using the
+traditional Paper/Leaf server architecture. Maintain **Minecraft 26.2 only**.
+
+- The only maintained fork branch is `TaoXiaoBai/Leaf-Performance ver/26.2`.
+- The only tracked Leaf upstream is `Winds-Studio/Leaf ver/26.2`.
+- Keep `mcVersion=26.2` and `apiVersion=26.2`. Never follow an upstream default
+  branch or migrate to another Minecraft version. If upstream 26.2 stops, retain
+  its last 26.2 baseline.
+- Keep cheap wins. Expensive complexity must earn its keep. No fixed percentage
+  threshold is required for a local, demonstrably cheaper, equivalent change;
+  do not add cross-tick caches, global indexes, concurrency, or complex state
+  machines for marginal gains.
+- Reuse previous verified evidence. Revisit retained/reverted candidates, old
+  smoke tests, benchmarks, and CI/release designs only when code or a supporting
+  assumption changes. State why the old evidence no longer applies.
 
 ## Allowed scope
 
@@ -16,38 +30,39 @@ files in these areas:
 
 Before editing, locate the actual applied source file in the current working
 tree. Follow the existing directory layout instead of assuming a source path.
-If a required applied source file is missing, report the missing target and ask
-the owner to prepare the source tree. Do not generate or apply sources, or edit
-patches as a substitute.
+If applied sources are missing or stale, prepare them with the canonical patch
+application tasks when the current development task authorizes it. Verify the
+exact `paperCommit` first; never substitute a different revision to bypass an
+environment failure.
 
 Files outside these applied source areas are read-only unless the user
 explicitly requests otherwise.
 
-## Patch restrictions
+## Canonical patch workflow
 
-Do not create, modify, delete, rename, regenerate, reformat, apply, rebuild,
-reset, or export patch files or patch metadata, including through patch rebuild
-or generation tasks.
+Within a user-authorized development task, agents may edit applied sources and
+create, modify, export, or rebuild the fork's own canonical patches. Do not
+modify an upstream repository. Updating upstream references requires explicit
+synchronization scope and must remain on Leaf `ver/26.2`.
 
-This covers Paper, Minecraft, API, Leaf, upstream, and generated `.patch` files,
-including patch metadata and ordering or series files. Reading them for review
-and attribution is allowed.
-
-Leaf patch directories (relative to the repository root; read-only):
+Canonical patch directories (relative to the repository root):
 
 - `leaf-server/minecraft-patches/`: Minecraft implementation changes.
 - `leaf-server/paper-patches/`: Paper server implementation changes.
 - `leaf-api/paper-patches/`: Paper API changes.
 
-`leaf-archived-patches/` is historical reference, not the current version's
-baseline.
+`leaf-archived-patches/` is historical reference, not the current baseline.
+Read the actual applied source before editing. Applied sources are generated
+working copies, not a persistent deliverable: after an independent reviewer
+accepts the changes, persist them in top-level canonical patches and verify
+patch application. Never leave accepted work only in a nested source repository.
+Preserve authorship, provenance, and required license notices.
 
-Do not reset applied sources from patches or update Paper or Minecraft upstream
-references. The repository owner converts source changes into patches when
-necessary.
-
-Applied source files are the editing target for the current task, even when
-patch files are the canonical persisted form used by the project.
+Keep edits and patch regeneration narrow. Do not renumber or rebuild the whole
+stack for cosmetic consistency. Identify a patch by its complete path/filename
+and implementation Git commit, never by a numeric prefix alone. Record its
+purpose, source, RETAIN/REVERT/DEFER decision, and last validation scope in the
+fork patch inventory; do not rewrite historical audit evidence.
 
 ## CodeGraph usage
 
@@ -79,18 +94,21 @@ affected the change or when the index appeared incomplete or stale.
 
 ## Validation policy
 
-Stop after modifying and reviewing the applied source; the owner performs
-compilation, testing, benchmarking, and runtime validation.
+Within an authorized development task, run necessary targeted compilation,
+small repeatable regression harnesses, canonical patch validation, and isolated
+startup/clean-shutdown checks. Match validation to changed code and risk; do not
+default to the full test suite, long stress runs, JFR, or benchmarks. Reuse
+unchanged verified evidence and report why any repeat is necessary.
 
-Do not run Gradle builds or compilation tasks, test suites, JMH benchmarks,
-patch validation or rebuild tasks, server startup tasks, modifying formatters,
-or scripts that generate or rewrite repository content.
+After implementation, use an independent reviewer who did not implement the
+changes. Review only this task's diff and directly affected call chains; fix or
+revert issues and request a narrow re-review. Reviewer outcomes may be RETAIN,
+REWORK, REVERT, or DEFER. Persist accepted source changes as canonical patches.
 
-Read-only inspection is allowed: locate files, search references, read source,
-patches, configuration, and Gradle files, and inspect Git status and diffs.
-
-Do not claim that a change compiles, passes tests, improves performance, or
-works at runtime unless the user provides corresponding verification results.
+Only claim compilation, tests, runtime behavior, or measured gains supported by
+actual results. Distinguish static work reduction from measured server gains.
+Missing proprietary plugin artifacts mean compatibility is UNVERIFIED, not
+passed. Never use an incorrect Paper revision to work around build tooling.
 
 ## Java conventions
 
@@ -155,9 +173,14 @@ Preserve all unrelated working-tree changes.
 Before editing, inspect the relevant files and use `git status` when available.
 Do not assume existing changes were produced by an agent.
 
-Do not run `git reset`, `git checkout --`, `git restore`, `git clean`,
-`git rebase`, `git commit`, or `git push`, or discard, overwrite, stage, or revert
-user changes, unless the user explicitly requests that exact action.
+Within a task explicitly authorizing commits and push, create focused commits
+and push normally to the fork's `ver/26.2`; verify remote HEAD and record the CI
+run URL without continuously polling Actions. Never push to upstream. Preserve
+all unrelated user changes; do not overwrite, stage, discard, or revert them.
+Do not use destructive reset/clean, rewrite published history, force-push, or
+delete branches, tags, releases, or user data without explicit authorization.
+Publication requires explicit authorization in the current task; development
+and push authorization alone does not authorize a release or tag.
 
 ## Review expectations
 

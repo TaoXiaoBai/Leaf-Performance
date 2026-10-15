@@ -9,6 +9,13 @@ plugins {
 val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
 val leafMavenPublicUrl = "https://maven.leafmc.one/snapshots/"
 
+// Leaf-Performance maintains 26.2 only, including builds from release tags.
+for (property in listOf("mcVersion", "apiVersion")) {
+    require(providers.gradleProperty(property).orNull == "26.2") {
+        "Leaf-Performance supports Minecraft 26.2 only; $property must be 26.2."
+    }
+}
+
 subprojects {
     apply(plugin = "java-library")
     apply(plugin = "maven-publish")

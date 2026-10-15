@@ -1,0 +1,6 @@
+name: SpawnerQuery
+version: 1.0.0-local
+main: local.leafperf.spawner.SpawnerQueryPlugin
+api-version: '26.2'
+load: POSTWORLD
+description: Isolated real-NMS BaseSpawner and bounded-query regression runner; shuts down server
